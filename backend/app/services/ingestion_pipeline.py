@@ -129,11 +129,11 @@ class IngestionPipelineService:
                     pattern = rf"\b({'|'.join(re.escape(w) for w in words)})\b"
                     return bool(re.search(pattern, combined, re.IGNORECASE))
 
-                if match_words(("security", "2fa", "auth", "encrypt", "permission", "password")):
+                if match_words(("security", "2fa", "auth", "authentication", "encrypt", "encryption", "permission", "permissions", "password", "passwords")):
                     return "Security"
-                if match_words(("billing", "expense", "payment", "plan", "pricing", "invoice", "cost")):
+                if match_words(("billing", "expense", "expenses", "payment", "payments", "plan", "plans", "pricing", "invoice", "invoices", "cost", "costs")):
                     return "Billing"
-                if match_words(("account", "user", "profile", "login", "membership")):
+                if match_words(("account", "accounts", "user", "users", "profile", "profiles", "login", "membership", "memberships")):
                     return "Account"
                 return "Workspace"
 
