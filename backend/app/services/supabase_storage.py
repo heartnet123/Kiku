@@ -155,22 +155,49 @@ class SupabaseStorageService:
                 "metadata": chunk.metadata,
             })
 
-    def search_chunks(self, workspace_id: str, query: str, top_k: int = 5) -> list[dict[str, Any]]:
-        """Retrieve matching chunks strictly scoped to workspace_id."""
+    def search_chunks(
+        self, workspace_id: str, query: str, category: str | None = None, top_k: int = 5
+    ) -> list[dict[str, Any]]:
+        """Retrieve matching chunks strictly scoped to workspace_id and optional category filter."""
         normalized = query.lower()
         matched = []
+
+        stop_words = {"what", "is", "the", "a", "an", "do", "i", "how", "to", "my", "in", "of", "for", "on", "with", "your", "can", "our", "are"}
+        query_words = [w for w in normalized.split() if w not in stop_words] or normalized.split()
+
+        target_cat = category.strip().lower() if category and category.strip().lower() != "all" else None
+
         for chunk in self._chunks:
             if chunk["workspace_id"] != workspace_id:
                 continue
-            
+
+            metadata = chunk.get("metadata", {})
+            chunk_cat = metadata.get("category", "").lower()
+            source_title = metadata.get("source_title", "").lower()
+
+            # If category filter is active, enforce strict category isolation
+            if target_cat:
+                cat_matched = (
+                    chunk_cat == target_cat
+                    or target_cat in source_title
+                    or target_cat in chunk["location"].lower()
+                    or target_cat in chunk["text"].lower()
+                )
+                if not cat_matched:
+                    continue
+
             score = 0
             text_lower = chunk["text"].lower()
-            query_words = normalized.split()
             for word in query_words:
                 if word in text_lower:
+                    score += 2
+                if word in source_title:
+                    score += 3
+                if word in chunk["location"].lower():
                     score += 1
 
-            matched.append((score, chunk))
+            if score > 0:
+                matched.append((score, chunk))
 
         # Sort by score descending
         matched.sort(key=lambda x: x[0], reverse=True)

@@ -122,9 +122,22 @@ class IngestionPipelineService:
             nodes = self.node_parser.get_nodes_from_documents(documents)
 
             # 3. Create ChunkLineage objects retaining exact workspace, source, version, and location lineage
+            def infer_category(title: str, path: str, text: str) -> str:
+                combined = f"{title} {path} {text}".lower()
+                if any(w in combined for w in ("security", "2fa", "auth", "encrypt", "permission", "password")):
+                    return "Security"
+                if any(w in combined for w in ("billing", "expense", "payment", "plan", "pricing", "invoice", "cost")):
+                    return "Billing"
+                if any(w in combined for w in ("account", "user", "profile", "login", "membership")):
+                    return "Account"
+                return "Workspace"
+
+            category = infer_category(source_doc.title, source_doc.file_path, "")
+
             chunk_lineages: list[ChunkLineage] = []
             for idx, node in enumerate(nodes):
                 loc = node.metadata.get("location") or f"Chunk {idx+1}"
+                chunk_cat = infer_category(source_doc.title, source_doc.file_path, node.get_content())
                 chunk_lineages.append(
                     ChunkLineage(
                         workspace_id=workspace_id,
@@ -136,6 +149,7 @@ class IngestionPipelineService:
                             "source_title": source_doc.title,
                             "file_type": source_doc.file_type.value if isinstance(source_doc.file_type, FileType) else str(source_doc.file_type),
                             "chunk_index": idx,
+                            "category": chunk_cat,
                         },
                     )
                 )
