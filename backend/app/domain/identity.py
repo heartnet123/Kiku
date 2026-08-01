@@ -4,6 +4,8 @@ import hashlib
 import secrets
 from typing import Any
 
+PBKDF2_ITERATIONS = 600_000
+
 
 class Role(str, Enum):
     ADMIN = "admin"
@@ -11,9 +13,9 @@ class Role(str, Enum):
 
 
 def hash_password(password: str) -> str:
-    """Hash password using PBKDF2 with SHA-256 and a random salt."""
+    """Hash password using PBKDF2 with SHA-256 (OWASP recommended 600,000 iterations) and a random salt."""
     salt = secrets.token_hex(16)
-    key = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 100_000)
+    key = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), PBKDF2_ITERATIONS)
     return f"{salt}${key.hex()}"
 
 
@@ -21,7 +23,7 @@ def verify_password(password: str, hashed_password: str) -> bool:
     """Verify a plain password against PBKDF2 hash."""
     try:
         salt, stored_key = hashed_password.split("$", 1)
-        key = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 100_000)
+        key = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), PBKDF2_ITERATIONS)
         return secrets.compare_digest(key.hex(), stored_key)
     except Exception:
         return False

@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import secrets
 import uuid
 
 from fastapi import HTTPException, status
@@ -45,11 +46,12 @@ class WorkspaceMembershipService:
 
         if not user:
             user_id = f"user_{uuid.uuid4().hex[:8]}"
+            temp_password = secrets.token_urlsafe(16)
             user = User(
                 id=user_id,
                 email=email,
                 full_name=email.split("@")[0].capitalize(),
-                password_hash=hash_password("user123"),
+                password_hash=hash_password(temp_password),
             )
             DEMO_USERS[user_id] = user
 

@@ -13,7 +13,7 @@ MAX_AUDIT_CAPACITY = 500
 _AUDIT_LOGS: list[AuditLogEvent] = []
 
 SENSITIVE_KEYS = {"password", "token", "raw_query", "credentials", "bearer", "secret", "password_hash"}
-PII_KEYS = {"email", "attempted_email"}
+LOGGED_ALLOWED_KEYS = {"role", "old_role", "new_role", "rating", "safe_field", "email", "attempted_email"}
 
 
 def sanitize_dict_recursive(data: Any) -> Any:
@@ -31,18 +31,21 @@ def sanitize_dict_recursive(data: Any) -> Any:
 
 
 def redact_pii_recursive(data: Any) -> Any:
-    """Redact PII fields (such as email addresses) for application stdout logs."""
+    """Fail-closed log detail sanitizer using an explicit key allowlist for application stdout logs."""
     if isinstance(data, dict):
         redacted = {}
         for k, v in data.items():
-            if k.lower() in PII_KEYS and isinstance(v, str):
+            k_lower = k.lower()
+            if k_lower in ("email", "attempted_email") and isinstance(v, str):
                 parts = v.split("@")
                 if len(parts) == 2:
                     redacted[k] = f"{parts[0][:2]}***@{parts[1]}"
                 else:
-                    redacted[k] = "[REDACTED]"
-            else:
+                    redacted[k] = "[REDACTED_EMAIL]"
+            elif k_lower in LOGGED_ALLOWED_KEYS:
                 redacted[k] = redact_pii_recursive(v)
+            else:
+                redacted[k] = "[REDACTED]"
         return redacted
     elif isinstance(data, list):
         return [redact_pii_recursive(item) for item in data]

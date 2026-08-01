@@ -2,13 +2,32 @@ from fastapi.testclient import TestClient
 import pytest
 
 from app.core.audit import clear_audit_logs, record_audit_event
+from app.core.auth import DEMO_MEMBERSHIPS, DEMO_USERS, DEMO_WORKSPACES, _TOKENS
 from app.main import app
 
 client = TestClient(app)
 
 
 @pytest.fixture(autouse=True)
-def reset_logs():
+def reset_state():
+    # Snapshot state before test
+    users_snapshot = DEMO_USERS.copy()
+    memberships_snapshot = DEMO_MEMBERSHIPS.copy()
+    tokens_snapshot = _TOKENS.copy()
+    clear_audit_logs()
+
+    yield
+
+    # Restore state after test regardless of pass/fail
+    DEMO_USERS.clear()
+    DEMO_USERS.update(users_snapshot)
+
+    DEMO_MEMBERSHIPS.clear()
+    DEMO_MEMBERSHIPS.update(memberships_snapshot)
+
+    _TOKENS.clear()
+    _TOKENS.update(tokens_snapshot)
+
     clear_audit_logs()
 
 

@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, Header, status
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials
 
-from app.core.auth import DEMO_MEMBERSHIPS, DEMO_WORKSPACES, authenticate_user, get_current_user
+from app.core.auth import DEMO_MEMBERSHIPS, DEMO_WORKSPACES, authenticate_user, get_current_user, security
 from app.domain.identity import User
 from app.schemas.workspace import LoginRequest, LoginResponse, UserResponse, WorkspaceResponse
 
@@ -45,9 +46,9 @@ async def login(request: LoginRequest) -> LoginResponse:
 @router.get("/me", response_model=LoginResponse)
 async def get_me(
     user: User = Depends(get_current_user),
-    authorization: str | None = Header(default=None),
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
 ) -> LoginResponse:
-    token = authorization.replace("Bearer ", "").strip() if authorization else ""
+    token = credentials.credentials if credentials else ""
     user_workspaces = _build_user_workspaces(user.id)
     return LoginResponse(
         token=token,
