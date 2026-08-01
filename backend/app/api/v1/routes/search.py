@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends
 
-from app.core.auth import AuthenticatedMemberContext, require_member
+from app.core.auth import DEMO_MEMBERSHIPS, AuthenticatedMemberContext, get_current_user, require_member
+from app.domain.identity import User
 from app.schemas.knowledge import SearchRequest, SearchResponse, SourceReferenceResponse, SourceResponse
 from app.services.knowledge_search import KnowledgeSearchService
 
@@ -53,3 +54,30 @@ async def search_knowledge(
         sources=sources_response,
         related_faqs=list(result.related_faqs),
     )
+
+
+def get_user_workspace_id(user: User = Depends(get_current_user)) -> str:
+    for (ws_id, u_id) in DEMO_MEMBERSHIPS:
+        if u_id == user.id:
+            return ws_id
+    return "ws_acme"
+
+
+top_level_router = APIRouter(tags=["knowledge"])
+
+
+@top_level_router.post("/search", response_model=SearchResponse)
+async def search_knowledge_alias(
+    request: SearchRequest,
+    workspace_id: str = Depends(get_user_workspace_id),
+    user: User = Depends(get_current_user),
+    service: KnowledgeSearchService = Depends(get_knowledge_search_service),
+) -> SearchResponse:
+    ctx = AuthenticatedMemberContext(
+        user=user,
+        membership=DEMO_MEMBERSHIPS.get((workspace_id, user.id)),
+        workspace=None,
+    )
+    return await search_knowledge(workspace_id=workspace_id, request=request, ctx=ctx, service=service)
+
+
