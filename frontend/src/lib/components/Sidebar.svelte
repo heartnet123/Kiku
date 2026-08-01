@@ -3,6 +3,7 @@
 	import { resolve } from '$app/paths';
 	import Icon, { type IconName } from '$lib/components/Icon.svelte';
 	import KikuMascot from '$lib/components/KikuMascot.svelte';
+	import { authStore, logout, switchWorkspace } from '../stores/workspace';
 
 	type AppRoute = Parameters<typeof resolve>[0];
 	const navItems: { label: string; href: AppRoute; icon: IconName }[] = [
@@ -12,6 +13,12 @@
 		{ label: 'Analytics', href: '/analytics', icon: 'chart' },
 		{ label: 'Settings', href: '/settings', icon: 'settings' }
 	];
+
+	let isDropdownOpen = $state(false);
+
+	function toggleDropdown() {
+		isDropdownOpen = !isDropdownOpen;
+	}
 </script>
 
 <aside class="sidebar" aria-label="Main navigation">
@@ -45,11 +52,46 @@
 		</section>
 	</div>
 
-	<button class="team-switcher" type="button" aria-label="Switch team">
-		<span class="team-icon"><Icon name="users" size={20} /></span>
-		<span class="team-copy"><strong>Acme Team</strong><small>Pro Plan</small></span>
-		<Icon name="chevron-down" size={16} className="team-chevron" />
-	</button>
+	<div class="team-switcher-container">
+		{#if isDropdownOpen && $authStore.isAuthenticated}
+			<div class="workspace-dropdown">
+				<div class="dropdown-header">Workspaces</div>
+				{#each $authStore.workspaces as ws}
+					<button
+						type="button"
+						class="dropdown-item"
+						class:active={ws.id === $authStore.currentWorkspace?.id}
+						onclick={() => {
+							switchWorkspace(ws.id);
+							isDropdownOpen = false;
+						}}
+					>
+						<span>{ws.name}</span>
+						<span class="role-badge">{ws.role.toUpperCase()}</span>
+					</button>
+				{/each}
+				<button
+					type="button"
+					class="dropdown-item logout-item"
+					onclick={() => {
+						logout();
+						isDropdownOpen = false;
+					}}
+				>
+					<span>Sign Out / Switch Persona</span>
+				</button>
+			</div>
+		{/if}
+
+		<button class="team-switcher" type="button" onclick={toggleDropdown} aria-label="Switch team">
+			<span class="team-icon"><Icon name="users" size={20} /></span>
+			<span class="team-copy">
+				<strong>{$authStore.currentWorkspace?.name ?? 'Sign In Required'}</strong>
+				<small>{$authStore.user ? `${$authStore.user.full_name} (${$authStore.currentWorkspace?.role?.toUpperCase() || 'GUEST'})` : 'Click to sign in'}</small>
+			</span>
+			<Icon name="chevron-down" size={16} className="team-chevron" />
+		</button>
+	</div>
 </aside>
 
 <style>
@@ -169,6 +211,62 @@
 		color: var(--color-accent);
 		font-size: 26px;
 		line-height: 0.6;
+	}
+	.team-switcher-container {
+		position: relative;
+	}
+	.workspace-dropdown {
+		position: absolute;
+		bottom: 100%;
+		left: 0;
+		right: 0;
+		margin-bottom: 4px;
+		background: #1e1b2e;
+		border: 1px solid #332d4d;
+		border-radius: var(--radius-card);
+		padding: 6px;
+		z-index: 30;
+		box-shadow: 0 -4px 16px rgba(0,0,0,0.3);
+	}
+	.dropdown-header {
+		padding: 4px 8px;
+		font-size: 10px;
+		font-weight: 700;
+		color: #94a3b8;
+		text-transform: uppercase;
+	}
+	.dropdown-item {
+		width: 100%;
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: 8px;
+		background: transparent;
+		border: 0;
+		border-radius: var(--radius-control);
+		color: #e2e8f0;
+		font-size: 12px;
+		cursor: pointer;
+		text-align: left;
+	}
+	.dropdown-item:hover {
+		background: #2a2540;
+	}
+	.dropdown-item.active {
+		background: #3b2d66;
+		font-weight: 600;
+	}
+	.role-badge {
+		font-size: 9px;
+		padding: 2px 6px;
+		border-radius: 4px;
+		background: #475569;
+		color: #f8fafc;
+	}
+	.logout-item {
+		border-top: 1px solid #332d4d;
+		margin-top: 4px;
+		color: #f87171;
 	}
 	.team-switcher {
 		display: flex;

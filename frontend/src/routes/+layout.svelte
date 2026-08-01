@@ -1,9 +1,15 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import AppShell from '$lib/components/AppShell.svelte';
+	import { rehydrateAuth } from '$lib/stores/workspace';
 	import './layout.css';
 	import favicon from '$lib/assets/favicon.svg';
 
 	let { children } = $props();
+
+	onMount(() => {
+		rehydrateAuth();
+	});
 </script>
 
 <svelte:head>

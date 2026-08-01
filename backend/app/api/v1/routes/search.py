@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends
 
+from app.core.auth import AuthenticatedMemberContext, require_member
 from app.schemas.knowledge import SearchRequest, SearchResponse, SourceReferenceResponse, SourceResponse
 from app.services.knowledge_search import KnowledgeSearchService
 
-router = APIRouter(tags=["knowledge"])
+router = APIRouter(prefix="/workspaces/{workspace_id}", tags=["knowledge"])
 
 
 def get_knowledge_search_service() -> KnowledgeSearchService:
@@ -12,10 +13,12 @@ def get_knowledge_search_service() -> KnowledgeSearchService:
 
 @router.post("/search", response_model=SearchResponse)
 async def search_knowledge(
+    workspace_id: str,
     request: SearchRequest,
+    ctx: AuthenticatedMemberContext = Depends(require_member),
     service: KnowledgeSearchService = Depends(get_knowledge_search_service),
 ) -> SearchResponse:
-    result = service.search(request.query, request.category)
+    result = service.search(workspace_id=workspace_id, query=request.query, category=request.category)
     return SearchResponse(
         query=result.query,
         answer=result.answer,
