@@ -1,5 +1,6 @@
 import io
 import logging
+import re
 from typing import Any
 
 from llama_index.core import Document
@@ -123,12 +124,16 @@ class IngestionPipelineService:
 
             # 3. Create ChunkLineage objects retaining exact workspace, source, version, and location lineage
             def infer_category(title: str, path: str, text: str) -> str:
-                combined = f"{title} {path} {text}".lower()
-                if any(w in combined for w in ("security", "2fa", "auth", "encrypt", "permission", "password")):
+                combined = f"{title} {path} {text}"
+                def match_words(words: tuple[str, ...]) -> bool:
+                    pattern = rf"\b({'|'.join(re.escape(w) for w in words)})\b"
+                    return bool(re.search(pattern, combined, re.IGNORECASE))
+
+                if match_words(("security", "2fa", "auth", "encrypt", "permission", "password")):
                     return "Security"
-                if any(w in combined for w in ("billing", "expense", "payment", "plan", "pricing", "invoice", "cost")):
+                if match_words(("billing", "expense", "payment", "plan", "pricing", "invoice", "cost")):
                     return "Billing"
-                if any(w in combined for w in ("account", "user", "profile", "login", "membership")):
+                if match_words(("account", "user", "profile", "login", "membership")):
                     return "Account"
                 return "Workspace"
 

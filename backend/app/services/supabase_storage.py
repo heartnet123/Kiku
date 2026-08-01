@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 import os
+import re
 from typing import Any
 
 from app.domain.knowledge import (
@@ -166,6 +167,7 @@ class SupabaseStorageService:
         query_words = [w for w in normalized.split() if w not in stop_words] or normalized.split()
 
         target_cat = category.strip().lower() if category and category.strip().lower() != "all" else None
+        query_regexes = [re.compile(rf"\b{re.escape(w)}\b", re.IGNORECASE) for w in query_words]
 
         for chunk in self._chunks:
             if chunk["workspace_id"] != workspace_id:
@@ -173,27 +175,22 @@ class SupabaseStorageService:
 
             metadata = chunk.get("metadata", {})
             chunk_cat = metadata.get("category", "").lower()
-            source_title = metadata.get("source_title", "").lower()
+            source_title = metadata.get("source_title", "")
 
-            # If category filter is active, enforce strict category isolation
-            if target_cat:
-                cat_matched = (
-                    chunk_cat == target_cat
-                    or target_cat in source_title
-                    or target_cat in chunk["location"].lower()
-                    or target_cat in chunk["text"].lower()
-                )
-                if not cat_matched:
-                    continue
+            # Require exact match between chunk_cat and target_cat
+            if target_cat and chunk_cat != target_cat:
+                continue
 
             score = 0
-            text_lower = chunk["text"].lower()
-            for word in query_words:
-                if word in text_lower:
+            text_content = chunk["text"]
+            location_content = chunk["location"]
+
+            for rx in query_regexes:
+                if rx.search(text_content):
                     score += 2
-                if word in source_title:
+                if rx.search(source_title):
                     score += 3
-                if word in chunk["location"].lower():
+                if rx.search(location_content):
                     score += 1
 
             if score > 0:

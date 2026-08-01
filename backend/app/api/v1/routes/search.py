@@ -63,21 +63,23 @@ def get_user_workspace_id(user: User = Depends(get_current_user)) -> str:
     return "ws_acme"
 
 
+def require_alias_member_context(
+    user: User = Depends(get_current_user),
+) -> AuthenticatedMemberContext:
+    workspace_id = get_user_workspace_id(user)
+    return require_member(workspace_id=workspace_id, user=user)
+
+
 top_level_router = APIRouter(tags=["knowledge"])
 
 
 @top_level_router.post("/search", response_model=SearchResponse)
 async def search_knowledge_alias(
     request: SearchRequest,
-    workspace_id: str = Depends(get_user_workspace_id),
-    user: User = Depends(get_current_user),
+    ctx: AuthenticatedMemberContext = Depends(require_alias_member_context),
     service: KnowledgeSearchService = Depends(get_knowledge_search_service),
 ) -> SearchResponse:
-    ctx = AuthenticatedMemberContext(
-        user=user,
-        membership=DEMO_MEMBERSHIPS.get((workspace_id, user.id)),
-        workspace=None,
-    )
+    workspace_id = ctx.membership.workspace_id
     return await search_knowledge(workspace_id=workspace_id, request=request, ctx=ctx, service=service)
 
 

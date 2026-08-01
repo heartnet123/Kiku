@@ -172,7 +172,7 @@ def test_search_endpoint_contracts():
     assert ws_resp.status_code == 200
     assert ws_resp.json()["query"] == "engineering team"
 
-    # Test top-level endpoint alias
+    # Test top-level endpoint alias authorized
     top_resp = client.post(
         "/api/v1/search",
         json={"query": "engineering team"},
@@ -180,3 +180,10 @@ def test_search_endpoint_contracts():
     )
     assert top_resp.status_code == 200
     assert top_resp.json()["query"] == "engineering team"
+
+    # Test top-level endpoint alias unauthorized (missing token)
+    unauth_resp = client.post(
+        "/api/v1/search",
+        json={"query": "engineering team"},
+    )
+    assert unauth_resp.status_code == 401
