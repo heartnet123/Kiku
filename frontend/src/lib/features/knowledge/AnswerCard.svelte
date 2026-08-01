@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import Icon from '$lib/components/Icon.svelte';
 	import type { KnowledgeSearchResult } from './types';
 
@@ -14,9 +15,16 @@
 		<h3>{result.answer}</h3>
 		<p>{result.details}</p>
 	</div>
-	<a class="source-chip" href="#sources">
+	<a class="source-chip" href={resolve('/sources')}>
 		<span class="document-icon"><Icon name="document" size={16} /></span>
-		<strong>{result.source.id}</strong><span class="source-page">Page {result.source.page}</span>
+		<strong>{result.source.title || result.source.id}</strong>
+		{#if result.source.version}
+			<span
+				class="source-version-tag rounded bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[10px] text-emerald-700"
+				>v{result.source.version}</span
+			>
+		{/if}
+		<span class="source-page">{result.source.location || `Page ${result.source.page}`}</span>
 		<Icon name="external" size={16} className="external-icon" />
 	</a>
 	<div class="answer-divider"></div>

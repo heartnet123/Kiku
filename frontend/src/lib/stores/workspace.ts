@@ -70,7 +70,9 @@ export async function rehydrateAuth(): Promise<void> {
 
 	try {
 		authStore.update((s) => ({ ...s, token: storedToken }));
-		const res = await apiRequest<{ token: string; user: UserProfile; workspaces: WorkspaceItem[] }>('/api/v1/auth/me');
+		const res = await apiRequest<{ token: string; user: UserProfile; workspaces: WorkspaceItem[] }>(
+			'/api/v1/auth/me'
+		);
 		setAuthSession(res.token || storedToken, res.user, res.workspaces);
 	} catch (e) {
 		logout();
