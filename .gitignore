@@ -1,0 +1,31 @@
+# Local tooling and runtime state
+.omx/
+.venv/
+__pycache__/
+*.py[oc]
+*.egg-info/
+build/
+dist/
+wheels/
+
+# Node / JS
+node_modules/
+.output/
+.svelte-kit/
+.vercel/
+.netlify/
+.wrangler/
+
+# Environment files
+.env
+.env.*
+!.env.example
+!.env.test
+
+# OS & IDE noise
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/
+
