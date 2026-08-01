@@ -87,7 +87,11 @@
 			<span class="team-icon"><Icon name="users" size={20} /></span>
 			<span class="team-copy">
 				<strong>{$authStore.currentWorkspace?.name ?? 'Sign In Required'}</strong>
-				<small>{$authStore.user ? `${$authStore.user.full_name} (${$authStore.currentWorkspace?.role?.toUpperCase() || 'GUEST'})` : 'Click to sign in'}</small>
+				<small
+					>{$authStore.user
+						? `${$authStore.user.full_name} (${$authStore.currentWorkspace?.role?.toUpperCase() || 'GUEST'})`
+						: 'Click to sign in'}</small
+				>
 			</span>
 			<Icon name="chevron-down" size={16} className="team-chevron" />
 		</button>
@@ -226,7 +230,7 @@
 		border-radius: var(--radius-card);
 		padding: 6px;
 		z-index: 30;
-		box-shadow: 0 -4px 16px rgba(0,0,0,0.3);
+		box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.3);
 	}
 	.dropdown-header {
 		padding: 4px 8px;
