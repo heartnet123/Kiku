@@ -309,4 +309,47 @@
 		margin-left: auto;
 		color: var(--color-muted);
 	}
+	@media (max-width: 900px) {
+		.sidebar {
+			width: 216px;
+			flex-basis: 216px;
+		}
+	}
+	@media (max-width: 640px) {
+		.sidebar {
+			position: relative;
+			width: 100%;
+			height: auto;
+			min-height: 0;
+			border-right: 0;
+			border-bottom: 1px solid var(--color-border);
+		}
+		.sidebar-top {
+			padding: 17px 16px 14px;
+		}
+		.brand {
+			margin: 0 2px 16px;
+		}
+		.primary-nav {
+			display: flex;
+			gap: 5px;
+			overflow-x: auto;
+			padding-bottom: 2px;
+		}
+		.nav-item {
+			width: auto;
+			min-width: max-content;
+			padding: 8px 11px;
+		}
+		.nav-item span {
+			font-size: 12px;
+		}
+		.ask-kiku-card {
+			display: none;
+		}
+		.team-switcher {
+			min-height: 61px;
+			padding: 10px 16px;
+		}
+	}
 </style>

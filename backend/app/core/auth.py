@@ -1,12 +1,12 @@
 from dataclasses import dataclass
-import uuid
+import secrets
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, Header, status
+from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.audit import record_audit_event
-from app.domain.identity import Role, User, Workspace, WorkspaceMember
+from app.domain.identity import Role, User, Workspace, WorkspaceMember, hash_password, verify_password
 
 # Pre-seeded Demo Data
 DEMO_USERS = {
@@ -14,19 +14,19 @@ DEMO_USERS = {
         id="user_acme_admin",
         email="admin@acme.com",
         full_name="Acme Admin User",
-        password="admin123",
+        password_hash=hash_password("admin123"),
     ),
     "user_acme_member": User(
         id="user_acme_member",
         email="member@acme.com",
         full_name="Acme Team Member",
-        password="member123",
+        password_hash=hash_password("member123"),
     ),
     "user_globex_admin": User(
         id="user_globex_admin",
         email="admin@globex.com",
         full_name="Globex Admin User",
-        password="admin123",
+        password_hash=hash_password("admin123"),
     ),
 }
 
@@ -57,12 +57,8 @@ DEMO_MEMBERSHIPS: dict[tuple[str, str], WorkspaceMember] = {
     ),
 }
 
-# Token Store: token -> user_id
-_TOKENS: dict[str, str] = {
-    "token_acme_admin": "user_acme_admin",
-    "token_acme_member": "user_acme_member",
-    "token_globex_admin": "user_globex_admin",
-}
+# Token Store: token -> user_id (dynamically populated upon login)
+_TOKENS: dict[str, str] = {}
 
 security = HTTPBearer(auto_error=False)
 
@@ -70,8 +66,8 @@ security = HTTPBearer(auto_error=False)
 def authenticate_user(email: str, password: str) -> tuple[User, str] | None:
     """Authenticate user with email and password, returning (user, token) or None."""
     for user in DEMO_USERS.values():
-        if user.email.lower() == email.lower() and user.password == password:
-            token = f"token_{user.id}_{uuid.uuid4().hex[:8]}"
+        if user.email.lower() == email.lower() and verify_password(password, user.password_hash):
+            token = f"token_{user.id}_{secrets.token_urlsafe(32)}"
             _TOKENS[token] = user.id
             record_audit_event(
                 actor_id=user.id,

@@ -79,13 +79,13 @@ async def get_audit_logs(
     logs = service.get_audit_logs(workspace_id)
     return [
         AuditLogResponse(
-            id=l.id,
-            actor_id=l.actor_id,
-            workspace_id=l.workspace_id,
-            action=l.action,
-            target_id=l.target_id,
-            timestamp=l.timestamp,
-            details=l.details,
+            id=log.id,
+            actor_id=log.actor_id,
+            workspace_id=log.workspace_id,
+            action=log.action,
+            target_id=log.target_id,
+            timestamp=log.timestamp,
+            details=log.details,
         )
-        for l in logs
+        for log in logs
     ]

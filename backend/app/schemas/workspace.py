@@ -1,9 +1,9 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 from app.domain.identity import Role
 
 
 class LoginRequest(BaseModel):
-    email: str = Field(..., description="User email address")
+    email: EmailStr = Field(..., description="User email address")
     password: str = Field(..., description="User password")
 
 
@@ -35,7 +35,7 @@ class WorkspaceMemberResponse(BaseModel):
 
 
 class MemberInviteRequest(BaseModel):
-    email: str = Field(..., description="Email of user to invite")
+    email: EmailStr = Field(..., description="Email of user to invite")
     role: Role = Field(default=Role.MEMBER, description="Role to assign")
 
 

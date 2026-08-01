@@ -2,8 +2,10 @@
 	import { apiRequest } from '../api/client';
 	import { setAuthSession, type UserProfile, type WorkspaceItem } from '../stores/workspace';
 
-	let email = $state('admin@acme.com');
-	let password = $state('admin123');
+	const isDemoMode = import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEMO === 'true';
+
+	let email = $state(isDemoMode ? 'admin@acme.com' : '');
+	let password = $state(isDemoMode ? 'admin123' : '');
 	let errorMessage = $state('');
 	let isLoading = $state(false);
 
@@ -38,14 +40,19 @@
 	}
 </script>
 
-<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+<div
+	class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+	role="dialog"
+	aria-modal="true"
+	aria-labelledby="demo-login-title"
+>
 	<div class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-2xl text-slate-100">
 		<div class="flex items-center gap-3 mb-6">
 			<div class="w-10 h-10 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-lg text-white">
 				K
 			</div>
 			<div>
-				<h2 class="text-xl font-bold">Kiku Workspace Identity</h2>
+				<h2 id="demo-login-title" class="text-xl font-bold">Kiku Workspace Identity</h2>
 				<p class="text-xs text-slate-400">Sign in to access your team knowledge base</p>
 			</div>
 		</div>
@@ -88,45 +95,47 @@
 			</button>
 		</form>
 
-		<div class="mt-6 pt-4 border-t border-slate-800">
-			<span class="text-xs font-semibold text-slate-400 block mb-2">⚡ 1-Click Demo Personas:</span>
-			<div class="space-y-2">
-				<button
-					type="button"
-					onclick={() => selectPreset('admin@acme.com', 'admin123')}
-					class="w-full text-left px-3 py-2 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 rounded-lg text-xs flex justify-between items-center transition"
-				>
-					<div>
-						<span class="font-medium text-indigo-400">Acme Admin</span>
-						<span class="text-slate-400 block text-[10px]">admin@acme.com</span>
-					</div>
-					<span class="px-1.5 py-0.5 bg-indigo-900/60 text-indigo-300 rounded text-[10px]">ADMIN</span>
-				</button>
+		{#if isDemoMode}
+			<div class="mt-6 pt-4 border-t border-slate-800">
+				<span class="text-xs font-semibold text-slate-400 block mb-2">⚡ 1-Click Demo Personas:</span>
+				<div class="space-y-2">
+					<button
+						type="button"
+						onclick={() => selectPreset('admin@acme.com', 'admin123')}
+						class="w-full text-left px-3 py-2 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 rounded-lg text-xs flex justify-between items-center transition"
+					>
+						<div>
+							<span class="font-medium text-indigo-400">Acme Admin</span>
+							<span class="text-slate-400 block text-[10px]">admin@acme.com</span>
+						</div>
+						<span class="px-1.5 py-0.5 bg-indigo-900/60 text-indigo-300 rounded text-[10px]">ADMIN</span>
+					</button>
 
-				<button
-					type="button"
-					onclick={() => selectPreset('member@acme.com', 'member123')}
-					class="w-full text-left px-3 py-2 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 rounded-lg text-xs flex justify-between items-center transition"
-				>
-					<div>
-						<span class="font-medium text-emerald-400">Acme Member</span>
-						<span class="text-slate-400 block text-[10px]">member@acme.com</span>
-					</div>
-					<span class="px-1.5 py-0.5 bg-emerald-900/60 text-emerald-300 rounded text-[10px]">MEMBER</span>
-				</button>
+					<button
+						type="button"
+						onclick={() => selectPreset('member@acme.com', 'member123')}
+						class="w-full text-left px-3 py-2 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 rounded-lg text-xs flex justify-between items-center transition"
+					>
+						<div>
+							<span class="font-medium text-emerald-400">Acme Member</span>
+							<span class="text-slate-400 block text-[10px]">member@acme.com</span>
+						</div>
+						<span class="px-1.5 py-0.5 bg-emerald-900/60 text-emerald-300 rounded text-[10px]">MEMBER</span>
+					</button>
 
-				<button
-					type="button"
-					onclick={() => selectPreset('admin@globex.com', 'admin123')}
-					class="w-full text-left px-3 py-2 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 rounded-lg text-xs flex justify-between items-center transition"
-				>
-					<div>
-						<span class="font-medium text-amber-400">Globex Admin</span>
-						<span class="text-slate-400 block text-[10px]">admin@globex.com</span>
-					</div>
-					<span class="px-1.5 py-0.5 bg-amber-900/60 text-amber-300 rounded text-[10px]">CROSS-TENANT</span>
-				</button>
+					<button
+						type="button"
+						onclick={() => selectPreset('admin@globex.com', 'admin123')}
+						class="w-full text-left px-3 py-2 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 rounded-lg text-xs flex justify-between items-center transition"
+					>
+						<div>
+							<span class="font-medium text-amber-400">Globex Admin</span>
+							<span class="text-slate-400 block text-[10px]">admin@globex.com</span>
+						</div>
+						<span class="px-1.5 py-0.5 bg-amber-900/60 text-amber-300 rounded text-[10px]">CROSS-TENANT</span>
+					</button>
+				</div>
 			</div>
-		</div>
+		{/if}
 	</div>
 </div>

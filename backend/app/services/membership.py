@@ -4,13 +4,19 @@ import uuid
 from fastapi import HTTPException, status
 
 from app.core.audit import get_workspace_audit_logs, record_audit_event
-from app.core.auth import DEMO_MEMBERSHIPS, DEMO_USERS, DEMO_WORKSPACES
-from app.domain.identity import AuditLogEvent, Role, User, WorkspaceMember
+from app.core.auth import DEMO_MEMBERSHIPS, DEMO_USERS
+from app.domain.identity import AuditLogEvent, Role, User, WorkspaceMember, hash_password
 from app.schemas.workspace import WorkspaceMemberResponse
 
 
 class WorkspaceMembershipService:
     """Service to handle workspace member operations and audit logging."""
+
+    def _get_admin_count(self, workspace_id: str) -> int:
+        return sum(
+            1 for (ws_id, _), m in DEMO_MEMBERSHIPS.items()
+            if ws_id == workspace_id and m.role == Role.ADMIN
+        )
 
     def get_members(self, workspace_id: str) -> list[WorkspaceMemberResponse]:
         members: list[WorkspaceMemberResponse] = []
@@ -31,7 +37,6 @@ class WorkspaceMembershipService:
     def invite_member(
         self, actor_id: str, workspace_id: str, email: str, role: Role
     ) -> WorkspaceMemberResponse:
-        # Check if user exists in system or create demo user
         user = None
         for u in DEMO_USERS.values():
             if u.email.lower() == email.lower():
@@ -39,13 +44,12 @@ class WorkspaceMembershipService:
                 break
 
         if not user:
-            # Create a new user for demo purposes
             user_id = f"user_{uuid.uuid4().hex[:8]}"
             user = User(
                 id=user_id,
                 email=email,
                 full_name=email.split("@")[0].capitalize(),
-                password="user123",
+                password_hash=hash_password("user123"),
             )
             DEMO_USERS[user_id] = user
 
@@ -91,6 +95,13 @@ class WorkspaceMembershipService:
                 detail=f"Member '{target_user_id}' not found in workspace '{workspace_id}'.",
             )
 
+        if existing.role == Role.ADMIN and new_role != Role.ADMIN:
+            if self._get_admin_count(workspace_id) <= 1:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Cannot demote the sole remaining workspace administrator.",
+                )
+
         old_role = existing.role
         updated = WorkspaceMember(
             workspace_id=workspace_id,
@@ -125,6 +136,13 @@ class WorkspaceMembershipService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Member '{target_user_id}' not found in workspace '{workspace_id}'.",
             )
+
+        if existing.role == Role.ADMIN:
+            if self._get_admin_count(workspace_id) <= 1:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Cannot remove the sole remaining workspace administrator.",
+                )
 
         del DEMO_MEMBERSHIPS[key]
 

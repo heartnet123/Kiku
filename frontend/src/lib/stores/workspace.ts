@@ -20,6 +20,7 @@ export interface AuthState {
 	workspaces: WorkspaceItem[];
 	currentWorkspace: WorkspaceItem | null;
 	isAuthenticated: boolean;
+	isRehydrating: boolean;
 }
 
 const initialAuth: AuthState = {
@@ -27,7 +28,8 @@ const initialAuth: AuthState = {
 	user: null,
 	workspaces: [],
 	currentWorkspace: null,
-	isAuthenticated: false
+	isAuthenticated: false,
+	isRehydrating: true
 };
 
 export const authStore = writable<AuthState>(initialAuth);
@@ -39,17 +41,39 @@ export function setAuthSession(token: string, user: UserProfile, workspaces: Wor
 		user,
 		workspaces,
 		currentWorkspace: defaultWorkspace,
-		isAuthenticated: true
+		isAuthenticated: true,
+		isRehydrating: false
 	});
 	if (typeof window !== 'undefined') {
-		localStorage.setItem('kiku_auth_token', token);
+		sessionStorage.setItem('kiku_auth_token', token);
 	}
 }
 
 export function logout() {
-	authStore.set(initialAuth);
+	authStore.set({ ...initialAuth, isRehydrating: false });
 	if (typeof window !== 'undefined') {
-		localStorage.removeItem('kiku_auth_token');
+		sessionStorage.removeItem('kiku_auth_token');
+	}
+}
+
+export async function rehydrateAuth(): Promise<void> {
+	if (typeof window === 'undefined') {
+		authStore.update((s) => ({ ...s, isRehydrating: false }));
+		return;
+	}
+
+	const storedToken = sessionStorage.getItem('kiku_auth_token');
+	if (!storedToken) {
+		authStore.update((s) => ({ ...s, isRehydrating: false }));
+		return;
+	}
+
+	try {
+		authStore.update((s) => ({ ...s, token: storedToken }));
+		const res = await apiRequest<{ token: string; user: UserProfile; workspaces: WorkspaceItem[] }>('/api/v1/auth/me');
+		setAuthSession(res.token || storedToken, res.user, res.workspaces);
+	} catch (e) {
+		logout();
 	}
 }
 

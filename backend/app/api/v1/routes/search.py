@@ -18,7 +18,7 @@ async def search_knowledge(
     ctx: AuthenticatedMemberContext = Depends(require_member),
     service: KnowledgeSearchService = Depends(get_knowledge_search_service),
 ) -> SearchResponse:
-    result = service.search(request.query, request.category)
+    result = service.search(workspace_id=workspace_id, query=request.query, category=request.category)
     return SearchResponse(
         query=result.query,
         answer=result.answer,

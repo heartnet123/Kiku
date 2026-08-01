@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 import pytest
 
-from app.core.audit import clear_audit_logs, get_workspace_audit_logs
+from app.core.audit import clear_audit_logs, record_audit_event
 from app.main import app
 
 client = TestClient(app)
@@ -10,6 +10,17 @@ client = TestClient(app)
 @pytest.fixture(autouse=True)
 def reset_logs():
     clear_audit_logs()
+
+
+def _assert_no_sensitive_keys_recursive(data):
+    sensitive_keys = {"password", "token", "credentials", "bearer", "secret", "password_hash"}
+    if isinstance(data, dict):
+        for k, v in data.items():
+            assert k.lower() not in sensitive_keys, f"Found sensitive key '{k}' in audit details"
+            _assert_no_sensitive_keys_recursive(v)
+    elif isinstance(data, list):
+        for item in data:
+            _assert_no_sensitive_keys_recursive(item)
 
 
 def test_login_success_and_failure():
@@ -136,12 +147,52 @@ def test_audited_member_management():
     audit_resp = client.get("/api/v1/workspaces/ws_acme/audit-logs", headers=admin_headers)
     assert audit_resp.status_code == 200
     logs = audit_resp.json()
-    actions = [l["action"] for l in logs]
+    actions = [entry["action"] for entry in logs]
     assert "MEMBER_INVITED" in actions
     assert "ROLE_UPDATED" in actions
     assert "MEMBER_REMOVED" in actions
 
-    # Verify no raw password or secret is in audit log details
+    # Verify no raw password or secret is in audit log details, even nested
     for log in logs:
-        assert "password" not in log["details"]
-        assert "token" not in log["details"]
+        _assert_no_sensitive_keys_recursive(log["details"])
+
+
+def test_sole_admin_protection():
+    # Login as Globex Admin (ws_globex has only 1 admin: user_globex_admin)
+    login_resp = client.post("/api/v1/auth/login", json={"email": "admin@globex.com", "password": "admin123"})
+    token = login_resp.json()["token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Demoting sole admin should fail
+    demote_resp = client.patch(
+        "/api/v1/workspaces/ws_globex/members/user_globex_admin/role",
+        json={"role": "member"},
+        headers=headers,
+    )
+    assert demote_resp.status_code == 400
+    assert "sole remaining workspace administrator" in demote_resp.json()["detail"]
+
+    # Removing sole admin should fail
+    remove_resp = client.delete(
+        "/api/v1/workspaces/ws_globex/members/user_globex_admin",
+        headers=headers,
+    )
+    assert remove_resp.status_code == 400
+    assert "sole remaining workspace administrator" in remove_resp.json()["detail"]
+
+
+def test_recursive_audit_sanitization():
+    # Test record_audit_event directly with deeply nested secrets
+    nested_payload = {
+        "auth": {
+            "password": "secret_password",
+            "token": "secret_token",
+            "nested": {
+                "bearer": "secret_bearer",
+                "safe_field": "visible_value"
+            }
+        }
+    }
+    event = record_audit_event("user_1", "ws_acme", "TEST_EVENT", details=nested_payload)
+    _assert_no_sensitive_keys_recursive(event.details)
+    assert event.details["auth"]["nested"]["safe_field"] == "visible_value"

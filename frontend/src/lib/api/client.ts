@@ -1,5 +1,5 @@
 import { env } from '$env/dynamic/public';
-import { getAuthToken } from '../stores/workspace';
+import { getAuthToken, logout } from '../stores/workspace';
 
 const apiBaseUrl = (env.PUBLIC_API_BASE_URL ?? '').replace(/\/$/, '');
 
@@ -17,6 +17,7 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
 	});
 
 	if (response.status === 401) {
+		logout();
 		throw new Error('UNAUTHORIZED: Authentication required or token expired');
 	}
 
