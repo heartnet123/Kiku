@@ -10,6 +10,8 @@ from app.domain.knowledge import (
     KnowledgeSourceDocument,
     SourceStatus,
 )
+from app.services.embedding_service import embedding_service
+
 
 
 class SupabaseStorageService:
@@ -159,9 +161,12 @@ class SupabaseStorageService:
     def search_chunks(
         self, workspace_id: str, query: str, category: str | None = None, top_k: int = 5
     ) -> list[dict[str, Any]]:
-        """Retrieve matching chunks strictly scoped to workspace_id and optional category filter."""
+        """Retrieve matching chunks strictly scoped to workspace_id using Vector Cosine Similarity and Keyword scoring."""
         normalized = query.lower()
         matched = []
+
+        # Generate query embedding if OpenAI embedding API is configured
+        query_embedding = embedding_service.get_embedding(query)
 
         stop_words = {"what", "is", "the", "a", "an", "do", "i", "how", "to", "my", "in", "of", "for", "on", "with", "your", "can", "our", "are"}
         query_words = [w for w in normalized.split() if w not in stop_words] or normalized.split()
@@ -176,29 +181,38 @@ class SupabaseStorageService:
             metadata = chunk.get("metadata", {})
             chunk_cat = metadata.get("category", "").lower()
             source_title = metadata.get("source_title", "")
+            chunk_embedding = metadata.get("embedding")
 
             # Require exact match between chunk_cat and target_cat
             if target_cat and chunk_cat != target_cat:
                 continue
 
-            score = 0
+            score = 0.0
+
+            # 1. Vector Cosine Similarity Score (Weight: 10.0)
+            if query_embedding and chunk_embedding:
+                vector_sim = embedding_service.cosine_similarity(query_embedding, chunk_embedding)
+                score += vector_sim * 10.0
+
+            # 2. Keyword & Title Matching Score (Weight: 1.0 - 3.0)
             text_content = chunk["text"]
             location_content = chunk["location"]
 
             for rx in query_regexes:
                 if rx.search(text_content):
-                    score += 2
+                    score += 2.0
                 if rx.search(source_title):
-                    score += 3
+                    score += 3.0
                 if rx.search(location_content):
-                    score += 1
+                    score += 1.0
 
-            if score > 0:
+            if score > 0.0:
                 matched.append((score, chunk))
 
         # Sort by score descending
         matched.sort(key=lambda x: x[0], reverse=True)
         return [item[1] for item in matched[:top_k]]
+
 
     def get_metrics(self, workspace_id: str) -> dict[str, Any]:
         """Aggregate ingestion telemetry metrics."""

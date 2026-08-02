@@ -13,9 +13,11 @@ from app.domain.knowledge import (
     KnowledgeSourceDocument,
     SourceStatus,
 )
+from app.services.embedding_service import embedding_service
 from app.services.supabase_storage import SupabaseStorageService, storage_service
 
 logger = logging.getLogger(__name__)
+
 
 
 class IngestionPipelineService:
@@ -141,6 +143,8 @@ class IngestionPipelineService:
             for idx, node in enumerate(nodes):
                 loc = node.metadata.get("location") or f"Chunk {idx+1}"
                 chunk_cat = infer_category(source_doc.title, source_doc.file_path, node.get_content())
+                emb = embedding_service.get_embedding(node.get_content())
+                
                 chunk_lineages.append(
                     ChunkLineage(
                         workspace_id=workspace_id,
@@ -153,9 +157,11 @@ class IngestionPipelineService:
                             "file_type": source_doc.file_type.value if isinstance(source_doc.file_type, FileType) else str(source_doc.file_type),
                             "chunk_index": idx,
                             "category": chunk_cat,
+                            "embedding": emb,
                         },
                     )
                 )
+
 
             # 4. Save searchable chunks to vector store
             self.storage.save_chunks(
