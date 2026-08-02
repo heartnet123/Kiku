@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 import pytest
+from unittest.mock import MagicMock, patch
 
 from app.core.audit import clear_audit_logs, record_audit_event
 from app.main import app
@@ -68,7 +69,16 @@ def test_refresh_session_request_body():
     query_resp = client.post("/api/v1/auth/refresh?refresh_token=dummy_token")
     assert query_resp.status_code == 422
 
-    json_resp = client.post("/api/v1/auth/refresh", json={"refresh_token": "dummy_token"})
-    assert json_resp.status_code in (401, 503)
+    supabase_mock = MagicMock()
+    supabase_mock.auth.refresh_session.side_effect = Exception("invalid token")
+
+    with patch(
+        "app.api.v1.routes.auth_routes.create_supabase_client",
+        return_value=supabase_mock,
+    ):
+        json_resp = client.post("/api/v1/auth/refresh", json={"refresh_token": "dummy_token"})
+
+    assert json_resp.status_code == 401
+    supabase_mock.auth.refresh_session.assert_called_once_with("dummy_token")
 
 
