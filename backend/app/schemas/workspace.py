@@ -7,6 +7,16 @@ class LoginRequest(BaseModel):
     password: str = Field(..., description="User password")
 
 
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str = Field(..., description="Supabase refresh token for session renewal")
+
+
+class RegisterRequest(BaseModel):
+    email: EmailStr = Field(..., description="User email address")
+    password: str = Field(..., min_length=8, max_length=128)
+    full_name: str = Field(..., min_length=1, max_length=120)
+
+
 class UserResponse(BaseModel):
     id: str
     email: str
@@ -21,9 +31,21 @@ class WorkspaceResponse(BaseModel):
 
 
 class LoginResponse(BaseModel):
-    token: str
+    token: str | None = None
+    refresh_token: str | None = None
     user: UserResponse
     workspaces: list[WorkspaceResponse]
+    requires_email_confirmation: bool = False
+
+
+class WorkspaceCreateRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=120)
+    slug: str | None = Field(default=None, min_length=3, max_length=64)
+
+
+class WorkspaceJoinRequest(BaseModel):
+    workspace_id: str | None = None
+    slug: str | None = Field(default=None, min_length=1, max_length=64)
 
 
 class WorkspaceMemberResponse(BaseModel):

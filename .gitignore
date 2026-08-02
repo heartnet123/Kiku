@@ -1,5 +1,8 @@
 # Local tooling and runtime state
 .omx/
+.omc/
+.serena/
+.codegraph/
 .venv/
 docs/
 ROADMAP.html

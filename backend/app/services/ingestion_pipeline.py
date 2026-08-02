@@ -13,9 +13,11 @@ from app.domain.knowledge import (
     KnowledgeSourceDocument,
     SourceStatus,
 )
+from app.services.embedding_service import embedding_service
 from app.services.supabase_storage import SupabaseStorageService, storage_service
 
 logger = logging.getLogger(__name__)
+
 
 
 class IngestionPipelineService:
@@ -108,7 +110,7 @@ class IngestionPipelineService:
             raise ValueError(f"Source document '{source_id}' not found in workspace '{workspace_id}'")
 
         # Set status to PROCESSING
-        self.storage.update_source_status(source_id, SourceStatus.PROCESSING)
+        self.storage.update_source_status(source_id, SourceStatus.PROCESSING, workspace_id=workspace_id)
 
         try:
             file_content = self.storage.get_file(source_doc.file_path)
@@ -141,6 +143,8 @@ class IngestionPipelineService:
             for idx, node in enumerate(nodes):
                 loc = node.metadata.get("location") or f"Chunk {idx+1}"
                 chunk_cat = infer_category(source_doc.title, source_doc.file_path, node.get_content())
+                emb = embedding_service.get_embedding(node.get_content())
+                
                 chunk_lineages.append(
                     ChunkLineage(
                         workspace_id=workspace_id,
@@ -153,9 +157,11 @@ class IngestionPipelineService:
                             "file_type": source_doc.file_type.value if isinstance(source_doc.file_type, FileType) else str(source_doc.file_type),
                             "chunk_index": idx,
                             "category": chunk_cat,
+                            "embedding": emb,
                         },
                     )
                 )
+
 
             # 4. Save searchable chunks to vector store
             self.storage.save_chunks(
@@ -166,7 +172,7 @@ class IngestionPipelineService:
             )
 
             # 5. Transition status to READY
-            updated_doc = self.storage.update_source_status(source_id, SourceStatus.READY, reason=None)
+            updated_doc = self.storage.update_source_status(source_id, SourceStatus.READY, reason=None, workspace_id=workspace_id)
             logger.info(f"Ingestion successful for source '{source_id}' (v{source_doc.current_version})")
             return updated_doc or source_doc
 
@@ -174,7 +180,7 @@ class IngestionPipelineService:
             error_reason = str(err) or "Ingestion processing failed unexpectedly."
             logger.error(f"Ingestion failed for source '{source_id}': {error_reason}")
             updated_doc = self.storage.update_source_status(
-                source_id, SourceStatus.FAILED, reason=error_reason
+                source_id, SourceStatus.FAILED, reason=error_reason, workspace_id=workspace_id
             )
             return updated_doc or source_doc
 

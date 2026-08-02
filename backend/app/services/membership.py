@@ -1,159 +1,145 @@
 from datetime import datetime, timezone
 import secrets
 import uuid
+from typing import Any
 
 from fastapi import HTTPException, status
+from supabase import Client
 
 from app.core.audit import get_workspace_audit_logs, record_audit_event
-from app.core.auth import DEMO_MEMBERSHIPS, DEMO_USERS
 from app.domain.identity import AuditLogEvent, Role, User, WorkspaceMember, hash_password
 from app.schemas.workspace import WorkspaceMemberResponse
+from app.services.supabase_client import create_supabase_client, response_data
+
+
+def _db_role(role: Role) -> str:
+    return "viewer" if role == Role.MEMBER else role.value
+
+
+def _response(row: dict[str, Any], user: dict[str, Any]) -> WorkspaceMemberResponse:
+    return WorkspaceMemberResponse(
+        user_id=str(row["user_id"]),
+        email=str(user.get("email") or ""),
+        full_name=str(user.get("full_name") or user.get("email") or "Kiku User"),
+        role=Role(str(row["role"])),
+        joined_at=str(row.get("created_at") or row.get("joined_at") or ""),
+    )
 
 
 class WorkspaceMembershipService:
-    """Service to handle workspace member operations and audit logging."""
+    """Workspace membership operations via Supabase RLS clients."""
 
-    def _get_admin_count(self, workspace_id: str) -> int:
-        return sum(
-            1 for (ws_id, _), m in DEMO_MEMBERSHIPS.items()
-            if ws_id == workspace_id and m.role == Role.ADMIN
-        )
+    def __init__(self, *, client: Client | None = None, user_id: str | None = None) -> None:
+        self.client = client
+        self.user_id = user_id
 
     def get_members(self, workspace_id: str) -> list[WorkspaceMemberResponse]:
-        members: list[WorkspaceMemberResponse] = []
-        for (ws_id, u_id), membership in list(DEMO_MEMBERSHIPS.items()):
-            if ws_id == workspace_id and u_id in DEMO_USERS:
-                user = DEMO_USERS[u_id]
-                members.append(
-                    WorkspaceMemberResponse(
-                        user_id=user.id,
-                        email=user.email,
-                        full_name=user.full_name,
-                        role=membership.role,
-                        joined_at=membership.joined_at,
-                    )
-                )
-        return members
+        if not self.client:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Supabase connection is not configured.",
+            )
+
+        rows = response_data(
+            self.client.table("workspace_members")
+            .select("workspace_id,user_id,role,created_at")
+            .eq("workspace_id", workspace_id)
+            .execute()
+        )
+        user_ids = [str(row["user_id"]) for row in rows]
+        users = response_data(
+            self.client.table("users").select("id,email,full_name").in_("id", user_ids).execute()
+        ) if user_ids else []
+        users_by_id = {str(user["id"]): user for user in users}
+        return [_response(row, users_by_id.get(str(row["user_id"]), {})) for row in rows]
 
     def invite_member(
         self, actor_id: str, workspace_id: str, email: str, role: Role
     ) -> WorkspaceMemberResponse:
-        user = None
-        for u in DEMO_USERS.values():
-            if u.email.lower() == email.lower():
-                user = u
-                break
-
-        if not user:
-            user_id = f"user_{uuid.uuid4().hex[:8]}"
-            temp_password = secrets.token_urlsafe(16)
-            user = User(
-                id=user_id,
-                email=email,
-                full_name=email.split("@")[0].capitalize(),
-                password_hash=hash_password(temp_password),
-            )
-            DEMO_USERS[user_id] = user
-
-        if (workspace_id, user.id) in DEMO_MEMBERSHIPS:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"User '{email}' is already a member of this workspace.",
-            )
-
-        now_iso = datetime.now(timezone.utc).isoformat()
-        membership = WorkspaceMember(
-            workspace_id=workspace_id,
-            user_id=user.id,
-            role=role,
-            joined_at=now_iso,
-        )
-        DEMO_MEMBERSHIPS[(workspace_id, user.id)] = membership
-
-        record_audit_event(
-            actor_id=actor_id,
-            workspace_id=workspace_id,
-            action="MEMBER_INVITED",
-            target_id=user.id,
-            details={"email": email, "role": role.value},
-        )
-
-        return WorkspaceMemberResponse(
-            user_id=user.id,
-            email=user.email,
-            full_name=user.full_name,
-            role=membership.role,
-            joined_at=membership.joined_at,
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="Use the workspace join flow or configure a Supabase service-role key for email invitations.",
         )
 
     def update_member_role(
         self, actor_id: str, workspace_id: str, target_user_id: str, new_role: Role
     ) -> WorkspaceMemberResponse:
-        key = (workspace_id, target_user_id)
-        existing = DEMO_MEMBERSHIPS.get(key)
-        if not existing or target_user_id not in DEMO_USERS:
+        if not self.client:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Member '{target_user_id}' not found in workspace '{workspace_id}'.",
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Supabase connection is not configured.",
             )
 
-        if existing.role == Role.ADMIN and new_role != Role.ADMIN:
-            if self._get_admin_count(workspace_id) <= 1:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Cannot demote the sole remaining workspace administrator.",
-                )
-
-        old_role = existing.role
-        updated = WorkspaceMember(
-            workspace_id=workspace_id,
-            user_id=target_user_id,
-            role=new_role,
-            joined_at=existing.joined_at,
+        rows = response_data(
+            self.client.table("workspace_members")
+            .select("workspace_id,user_id,role,created_at")
+            .eq("workspace_id", workspace_id)
+            .eq("user_id", target_user_id)
+            .execute()
         )
-        DEMO_MEMBERSHIPS[key] = updated
-        user = DEMO_USERS[target_user_id]
-
+        if not rows:
+            raise HTTPException(status_code=404, detail="Member not found.")
+        existing = rows[0]
+        db_role = _db_role(new_role)
+        if new_role == Role.OWNER or db_role == "owner":
+            raise HTTPException(status_code=400, detail="Cannot assign OWNER role via update_member_role.")
+        if existing["role"] == "owner" and db_role != "owner":
+            raise HTTPException(status_code=400, detail="The workspace owner cannot be demoted.")
+        updated = response_data(
+            self.client.table("workspace_members")
+            .update({"role": db_role})
+            .eq("workspace_id", workspace_id)
+            .eq("user_id", target_user_id)
+            .execute()
+        )
+        if not updated:
+            raise HTTPException(status_code=400, detail="Unable to update member role.")
         record_audit_event(
-            actor_id=actor_id,
-            workspace_id=workspace_id,
-            action="ROLE_UPDATED",
+            actor_id,
+            workspace_id,
+            "MEMBER_ROLE_UPDATED",
             target_id=target_user_id,
-            details={"old_role": old_role.value, "new_role": new_role.value},
+            details={"old_role": existing["role"], "new_role": db_role},
         )
-
-        return WorkspaceMemberResponse(
-            user_id=user.id,
-            email=user.email,
-            full_name=user.full_name,
-            role=updated.role,
-            joined_at=updated.joined_at,
+        users = response_data(
+            self.client.table("users").select("id,email,full_name").eq("id", target_user_id).execute()
         )
+        return _response(updated[0], users[0] if users else {})
 
     def remove_member(self, actor_id: str, workspace_id: str, target_user_id: str) -> None:
-        key = (workspace_id, target_user_id)
-        existing = DEMO_MEMBERSHIPS.get(key)
-        if not existing:
+        if not self.client:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Member '{target_user_id}' not found in workspace '{workspace_id}'.",
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Supabase connection is not configured.",
             )
 
-        if existing.role == Role.ADMIN:
-            if self._get_admin_count(workspace_id) <= 1:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Cannot remove the sole remaining workspace administrator.",
-                )
-
-        del DEMO_MEMBERSHIPS[key]
-
+        rows = response_data(
+            self.client.table("workspace_members")
+            .select("role")
+            .eq("workspace_id", workspace_id)
+            .eq("user_id", target_user_id)
+            .execute()
+        )
+        if not rows:
+            raise HTTPException(status_code=404, detail="Member not found.")
+        if rows[0]["role"] == "owner":
+            raise HTTPException(status_code=400, detail="The workspace owner cannot be removed.")
+        deleted = response_data(
+            self.client.table("workspace_members")
+            .delete()
+            .eq("workspace_id", workspace_id)
+            .eq("user_id", target_user_id)
+            .execute()
+        )
+        if not deleted:
+            raise HTTPException(status_code=400, detail="Unable to remove member.")
         record_audit_event(
-            actor_id=actor_id,
-            workspace_id=workspace_id,
-            action="MEMBER_REMOVED",
+            actor_id,
+            workspace_id,
+            "MEMBER_REMOVED",
             target_id=target_user_id,
         )
 
     def get_audit_logs(self, workspace_id: str) -> list[AuditLogEvent]:
         return get_workspace_audit_logs(workspace_id)
+

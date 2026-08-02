@@ -1,16 +1,39 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.core.auth import DEMO_MEMBERSHIPS, AuthenticatedMemberContext, get_current_user, require_member
+from app.core.auth import (
+    AuthenticatedMemberContext,
+    get_access_token,
+    get_authenticated_member,
+    get_current_user,
+    require_member,
+)
+
 from app.domain.identity import User
 from app.schemas.knowledge import SearchRequest, SearchResponse, SourceReferenceResponse, SourceResponse
 from app.services.knowledge_search import KnowledgeSearchService
+from app.services.supabase_storage import SupabaseStorageService
+from app.services.supabase_client import create_supabase_client, response_data
 
 router = APIRouter(prefix="/workspaces/{workspace_id}", tags=["knowledge"])
 
 
 def get_knowledge_search_service() -> KnowledgeSearchService:
-    """Dependency provider returning a KnowledgeSearchService instance."""
     return KnowledgeSearchService()
+
+
+def _scoped_service(
+    ctx: AuthenticatedMemberContext,
+    service: KnowledgeSearchService,
+) -> KnowledgeSearchService:
+    if ctx.supabase is None:
+        return service
+    return KnowledgeSearchService(
+        storage=SupabaseStorageService(client=ctx.supabase, user_id=ctx.user.id),
+        chat_storage=service.chat_storage,
+        api_base_url=service.api_base_url,
+        api_key=service.api_key,
+        model=service.model,
+    )
 
 
 @router.post("/search", response_model=SearchResponse)
@@ -20,9 +43,11 @@ async def search_knowledge(
     ctx: AuthenticatedMemberContext = Depends(require_member),
     service: KnowledgeSearchService = Depends(get_knowledge_search_service),
 ) -> SearchResponse:
-    """Perform workspace-scoped retrieval over indexed knowledge sources."""
-    result = service.search(workspace_id=workspace_id, query=request.query, category=request.category)
-    
+    result = _scoped_service(ctx, service).search(
+        workspace_id=workspace_id,
+        query=request.query,
+        category=request.category,
+    )
     citation_ref = SourceReferenceResponse(
         id=result.source_id,
         page=result.source_page,
@@ -31,23 +56,20 @@ async def search_knowledge(
         location=result.citation.location if result.citation else None,
         snippet=result.citation.snippet if result.citation else None,
     )
-
-    sources_response = []
-    for s in result.sources:
-        sources_response.append(
-            SourceResponse(
-                id=s.id,
-                workspace_id=workspace_id,
-                title=s.title,
-                file_type="markdown",
-                current_version=getattr(s, "version", 1),
-                status=getattr(s, "status", "ready"),
-                status_reason=None,
-                page=s.page,
-                updated_at=s.updated_at,
-            )
+    sources_response = [
+        SourceResponse(
+            id=source.id,
+            workspace_id=workspace_id,
+            title=source.title,
+            file_type="markdown",
+            current_version=getattr(source, "version", 1),
+            status=getattr(source, "status", "ready"),
+            status_reason=None,
+            page=source.page,
+            updated_at=source.updated_at,
         )
-
+        for source in result.sources
+    ]
     return SearchResponse(
         query=result.query,
         answer=result.answer,
@@ -58,23 +80,28 @@ async def search_knowledge(
     )
 
 
-def get_user_workspace_id(user: User = Depends(get_current_user)) -> str:
-    """Resolve the default workspace ID for an authenticated user."""
-    workspace_ids = [ws_id for (ws_id, user_id) in DEMO_MEMBERSHIPS if user_id == user.id]
+def get_user_workspace_id(user: User, token: str) -> str:
+    client = create_supabase_client(token)
+
+    if not client:
+        raise HTTPException(status_code=503, detail="Supabase connection is not configured.")
+    rows = response_data(
+        client.table("workspace_members").select("workspace_id").eq("user_id", user.id).execute()
+    )
+    workspace_ids = [str(row["workspace_id"]) for row in rows]
     if len(workspace_ids) > 1:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Multiple workspaces found. Use a workspace-scoped search endpoint.",
-        )
-    return workspace_ids[0] if workspace_ids else "ws_acme"
+        raise HTTPException(status_code=409, detail="Multiple workspaces found. Use a workspace-scoped search endpoint.")
+    if not workspace_ids:
+        raise HTTPException(status_code=404, detail="No workspace membership found.")
+    return workspace_ids[0]
 
 
 def require_alias_member_context(
     user: User = Depends(get_current_user),
+    token: str = Depends(get_access_token),
 ) -> AuthenticatedMemberContext:
-    """Dependency validating workspace membership for top-level search requests."""
-    workspace_id = get_user_workspace_id(user)
-    return require_member(workspace_id=workspace_id, user=user)
+    workspace_id = get_user_workspace_id(user, token)
+    return get_authenticated_member(workspace_id, user, token)
 
 
 top_level_router = APIRouter(tags=["knowledge"])
@@ -86,8 +113,9 @@ async def search_knowledge_alias(
     ctx: AuthenticatedMemberContext = Depends(require_alias_member_context),
     service: KnowledgeSearchService = Depends(get_knowledge_search_service),
 ) -> SearchResponse:
-    """Top-level search endpoint alias resolving user workspace membership context."""
-    workspace_id = ctx.membership.workspace_id
-    return await search_knowledge(workspace_id=workspace_id, request=request, ctx=ctx, service=service)
-
-
+    return await search_knowledge(
+        workspace_id=ctx.membership.workspace_id,
+        request=request,
+        ctx=ctx,
+        service=service,
+    )

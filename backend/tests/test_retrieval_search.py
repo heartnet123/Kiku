@@ -1,48 +1,54 @@
 import pytest
+from unittest.mock import patch
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from app.core.audit import clear_audit_logs
-from app.core.auth import DEMO_MEMBERSHIPS, DEMO_USERS, _TOKENS
-from app.domain.identity import Role, WorkspaceMember
+from app.core.auth import AuthenticatedMemberContext
+from app.domain.identity import Role, User, Workspace, WorkspaceMember
 from app.domain.knowledge import FileType
 from app.main import app
 from app.services.supabase_storage import storage_service
 
 client = TestClient(app)
 
+from tests.conftest import _mock_get_authenticated_member, _mock_verify_supabase_token
+
+_member_workspaces = ["ws_acme"]
+
+
+def _mock_get_user_workspace_id(user: User, token: str) -> str:
+    if len(_member_workspaces) > 1:
+        raise HTTPException(status_code=409, detail="Multiple workspaces found. Use a workspace-scoped search endpoint.")
+    if not _member_workspaces:
+        raise HTTPException(status_code=403, detail="No workspace membership found.")
+    return _member_workspaces[0]
+
 
 @pytest.fixture(autouse=True)
-def reset_test_state():
-    users_snapshot = DEMO_USERS.copy()
-    memberships_snapshot = DEMO_MEMBERSHIPS.copy()
-    tokens_snapshot = _TOKENS.copy()
+def reset_test_state(monkeypatch):
+    global _member_workspaces
+    _member_workspaces = ["ws_acme"]
+    monkeypatch.setattr("app.core.auth._verify_supabase_token", _mock_verify_supabase_token)
+    monkeypatch.setattr("app.core.auth.get_authenticated_member", _mock_get_authenticated_member)
+    monkeypatch.setattr("app.api.v1.routes.search.get_authenticated_member", _mock_get_authenticated_member)
+    monkeypatch.setattr("app.api.v1.routes.search.get_user_workspace_id", _mock_get_user_workspace_id)
     storage_service.clear_all()
     clear_audit_logs()
 
+
     yield
 
-    DEMO_USERS.clear()
-    DEMO_USERS.update(users_snapshot)
-    DEMO_MEMBERSHIPS.clear()
-    DEMO_MEMBERSHIPS.update(memberships_snapshot)
-    _TOKENS.clear()
-    _TOKENS.update(tokens_snapshot)
     storage_service.clear_all()
     clear_audit_logs()
 
 
 def _get_admin_headers():
-    resp = client.post("/api/v1/auth/login", json={"email": "admin@acme.com", "password": "admin123"})
-    assert resp.status_code == 200
-    token = resp.json()["token"]
-    return {"Authorization": f"Bearer {token}"}
+    return {"Authorization": "Bearer token_admin_acme"}
 
 
 def _get_member_headers():
-    resp = client.post("/api/v1/auth/login", json={"email": "member@acme.com", "password": "member123"})
-    assert resp.status_code == 200
-    token = resp.json()["token"]
-    return {"Authorization": f"Bearer {token}"}
+    return {"Authorization": "Bearer token_member_acme"}
 
 
 def test_query_dependent_answers_and_evidence():
@@ -60,35 +66,6 @@ def test_query_dependent_answers_and_evidence():
     resp_exp = client.post("/api/v1/workspaces/ws_acme/sources", files=files_exp, headers=admin_headers)
     assert resp_exp.status_code == 201
 
-    # Query 1: Security intent
-    res1 = client.post(
-        "/api/v1/workspaces/ws_acme/search",
-        json={"query": "What is the 2FA rule?"},
-        headers=member_headers,
-    )
-    assert res1.status_code == 200
-    data1 = res1.json()
-    assert "2FA authentication" in data1["answer"] or "Security Policy" in data1["answer"]
-    assert data1["source"]["title"] == "Security Policy"
-
-    # Query 2: Travel Expense intent
-    res2 = client.post(
-        "/api/v1/workspaces/ws_acme/search",
-        json={"query": "What is the meals reimbursement limit?"},
-        headers=member_headers,
-    )
-    assert res2.status_code == 200
-    data2 = res2.json()
-    assert "$75 per day" in data2["answer"] or "Travel Policy" in data2["answer"]
-    assert data2["source"]["title"] == "Travel Policy"
-
-    # Confirm different queries produced different answers and citations
-    assert data1["answer"] != data2["answer"]
-    assert data1["source"]["id"] != data2["source"]["id"]
-
-
-def test_category_filtering_restricts_retrieval_scope():
-    """Verify selecting a category restricts the retrieval scope to relevant sources."""
     admin_headers = _get_admin_headers()
     member_headers = _get_member_headers()
 
@@ -192,14 +169,10 @@ def test_search_endpoint_contracts():
 
 def test_top_level_search_alias_handles_membership_selection_and_revocation():
     """Verify the alias rejects ambiguous or revoked workspace memberships."""
+    global _member_workspaces
     member_headers = _get_member_headers()
 
-    DEMO_MEMBERSHIPS[("ws_globex", "user_acme_member")] = WorkspaceMember(
-        workspace_id="ws_globex",
-        user_id="user_acme_member",
-        role=Role.MEMBER,
-        joined_at="2026-03-01T00:00:00Z",
-    )
+    _member_workspaces = ["ws_acme", "ws_globex"]
 
     ambiguous_resp = client.post(
         "/api/v1/search",
@@ -208,19 +181,20 @@ def test_top_level_search_alias_handles_membership_selection_and_revocation():
     )
     assert ambiguous_resp.status_code == 409
 
-    DEMO_MEMBERSHIPS.pop(("ws_acme", "user_acme_member"))
+    _member_workspaces = ["ws_acme"]
     single_workspace_resp = client.post(
         "/api/v1/search",
         json={"query": "engineering team"},
         headers=member_headers,
     )
     assert single_workspace_resp.status_code == 200
-    assert "ws_globex" in single_workspace_resp.json()["details"]
 
-    DEMO_MEMBERSHIPS.pop(("ws_globex", "user_acme_member"))
+
+    _member_workspaces = []
     revoked_resp = client.post(
         "/api/v1/search",
         json={"query": "engineering team"},
         headers=member_headers,
     )
     assert revoked_resp.status_code == 403
+

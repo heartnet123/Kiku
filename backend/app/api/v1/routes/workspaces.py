@@ -1,0 +1,85 @@
+import re
+import uuid
+
+from fastapi import APIRouter, Depends, HTTPException, status
+
+from app.core.auth import (
+    get_access_token,
+    get_current_user,
+)
+from app.domain.identity import Role, User, Workspace, WorkspaceMember
+from app.schemas.workspace import WorkspaceCreateRequest, WorkspaceJoinRequest, WorkspaceResponse
+from app.services.supabase_client import create_supabase_client, response_data
+
+router = APIRouter(prefix="/workspaces", tags=["workspaces"])
+
+
+def _slugify(value: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
+    return (slug or f"workspace-{uuid.uuid4().hex[:8]}")[:64]
+
+
+def _response(row: dict, role: str | Role) -> WorkspaceResponse:
+    return WorkspaceResponse(
+        id=str(row["id"]),
+        name=str(row["name"]),
+        slug=str(row["slug"]),
+        role=Role(role),
+    )
+
+
+@router.post("", response_model=WorkspaceResponse, status_code=status.HTTP_201_CREATED)
+async def create_workspace(
+    request: WorkspaceCreateRequest,
+    user: User = Depends(get_current_user),
+    token: str = Depends(get_access_token),
+) -> WorkspaceResponse:
+    slug = _slugify(request.slug or request.name)
+    client = create_supabase_client(token)
+    if not client:
+        raise HTTPException(status_code=503, detail="Supabase connection is not configured.")
+    try:
+        rows = response_data(
+            client.table("workspaces")
+            .insert({"name": request.name.strip(), "slug": slug, "owner_id": user.id})
+            .execute()
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Unable to create workspace.") from exc
+    if not rows:
+        raise HTTPException(status_code=400, detail="Workspace creation returned no row.")
+    ws = rows[0]
+    try:
+        client.table("workspace_members").insert(
+            {"workspace_id": str(ws["id"]), "user_id": user.id, "role": "owner"}
+        ).execute()
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Unable to create workspace membership.") from exc
+    return _response(ws, Role.OWNER)
+
+
+@router.post("/join", response_model=WorkspaceResponse)
+async def join_workspace(
+    request: WorkspaceJoinRequest,
+    user: User = Depends(get_current_user),
+    token: str = Depends(get_access_token),
+) -> WorkspaceResponse:
+    if not request.workspace_id and not request.slug:
+        raise HTTPException(status_code=422, detail="workspace_id or slug is required.")
+
+    client = create_supabase_client(token)
+
+    if not client:
+        raise HTTPException(status_code=503, detail="Supabase connection is not configured.")
+    function = "join_workspace_by_id" if request.workspace_id else "join_workspace_by_slug"
+    argument = {"target_workspace_id": request.workspace_id} if request.workspace_id else {"target_slug": request.slug}
+    try:
+        rows = response_data(client.rpc(function, argument).execute())
+    except Exception as exc:
+        raise HTTPException(
+            status_code=400,
+            detail="Unable to join workspace. Check the workspace identifier or apply the join migration.",
+        ) from exc
+    if not rows:
+        raise HTTPException(status_code=404, detail="Workspace not found.")
+    return _response(rows[0], rows[0].get("role", Role.VIEWER))
