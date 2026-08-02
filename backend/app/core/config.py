@@ -12,7 +12,7 @@ class Settings:
     api_prefix: str = "/api/v1"
     frontend_origin: str = os.getenv("KIKU_FRONTEND_ORIGIN", "http://localhost:5173")
     supabase_url: str = os.getenv("SUPABASE_URL", "")
-    supabase_key: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY", "")
+    supabase_key: str = os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_ANON_KEY", "")
     supabase_service_role_key: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
     
     # Opencode LLM Synthesis Configuration

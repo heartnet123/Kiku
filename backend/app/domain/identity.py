@@ -8,7 +8,11 @@ PBKDF2_ITERATIONS = 600_000
 
 
 class Role(str, Enum):
+    OWNER = "owner"
     ADMIN = "admin"
+    EDITOR = "editor"
+    VIEWER = "viewer"
+    # Kept for the in-memory demo contract.
     MEMBER = "member"
 
 

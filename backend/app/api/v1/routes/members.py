@@ -12,17 +12,16 @@ from app.services.membership import WorkspaceMembershipService
 router = APIRouter(prefix="/workspaces/{workspace_id}", tags=["members"])
 
 
-def get_membership_service() -> WorkspaceMembershipService:
-    return WorkspaceMembershipService()
+def _service(ctx: AuthenticatedMemberContext) -> WorkspaceMembershipService:
+    return WorkspaceMembershipService(client=ctx.supabase, user_id=ctx.user.id)
 
 
 @router.get("/members", response_model=list[WorkspaceMemberResponse])
 async def list_workspace_members(
     workspace_id: str,
     ctx: AuthenticatedMemberContext = Depends(require_member),
-    service: WorkspaceMembershipService = Depends(get_membership_service),
 ) -> list[WorkspaceMemberResponse]:
-    return service.get_members(workspace_id)
+    return _service(ctx).get_members(workspace_id)
 
 
 @router.post("/members/invite", response_model=WorkspaceMemberResponse, status_code=status.HTTP_201_CREATED)
@@ -30,12 +29,11 @@ async def invite_workspace_member(
     workspace_id: str,
     request: MemberInviteRequest,
     ctx: AuthenticatedMemberContext = Depends(require_admin),
-    service: WorkspaceMembershipService = Depends(get_membership_service),
 ) -> WorkspaceMemberResponse:
-    return service.invite_member(
+    return _service(ctx).invite_member(
         actor_id=ctx.user.id,
         workspace_id=workspace_id,
-        email=request.email,
+        email=str(request.email),
         role=request.role,
     )
 
@@ -46,9 +44,8 @@ async def update_member_role(
     user_id: str,
     request: RoleUpdateRequest,
     ctx: AuthenticatedMemberContext = Depends(require_admin),
-    service: WorkspaceMembershipService = Depends(get_membership_service),
 ) -> WorkspaceMemberResponse:
-    return service.update_member_role(
+    return _service(ctx).update_member_role(
         actor_id=ctx.user.id,
         workspace_id=workspace_id,
         target_user_id=user_id,
@@ -61,9 +58,8 @@ async def remove_workspace_member(
     workspace_id: str,
     user_id: str,
     ctx: AuthenticatedMemberContext = Depends(require_admin),
-    service: WorkspaceMembershipService = Depends(get_membership_service),
 ) -> None:
-    service.remove_member(
+    _service(ctx).remove_member(
         actor_id=ctx.user.id,
         workspace_id=workspace_id,
         target_user_id=user_id,
@@ -74,14 +70,13 @@ async def remove_workspace_member(
 async def get_audit_logs(
     workspace_id: str,
     ctx: AuthenticatedMemberContext = Depends(require_admin),
-    service: WorkspaceMembershipService = Depends(get_membership_service),
 ) -> list[AuditLogResponse]:
-    logs = service.get_audit_logs(workspace_id)
+    logs = _service(ctx).get_audit_logs(workspace_id)
     return [
         AuditLogResponse(
             id=log.id,
             actor_id=log.actor_id,
-            workspace_id=log.workspace_id,
+            workspace_id=workspace_id,
             action=log.action,
             target_id=log.target_id,
             timestamp=log.timestamp,
