@@ -165,22 +165,30 @@ def get_authenticated_member(
             detail="Supabase connection is not configured.",
         )
 
-    workspace_rows = response_data(
-        client.table("workspaces").select("id,name,slug").eq("id", workspace_id).execute()
-    )
-    if not workspace_rows:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Workspace '{workspace_id}' does not exist.",
+    try:
+        workspace_rows = response_data(
+            client.table("workspaces").select("id,name,slug").eq("id", workspace_id).execute()
         )
+        if not workspace_rows:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Workspace '{workspace_id}' does not exist.",
+            )
 
-    membership_rows = response_data(
-        client.table("workspace_members")
-        .select("workspace_id,user_id,role,created_at")
-        .eq("workspace_id", workspace_id)
-        .eq("user_id", user.id)
-        .execute()
-    )
+        membership_rows = response_data(
+            client.table("workspace_members")
+            .select("workspace_id,user_id,role,created_at")
+            .eq("workspace_id", workspace_id)
+            .eq("user_id", user.id)
+            .execute()
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unable to verify workspace membership.",
+        ) from exc
     if not membership_rows:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

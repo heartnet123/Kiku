@@ -1,5 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
+import httpx
+try:
+    from supabase_auth.errors import AuthApiError, AuthRetryableError
+except ImportError:
+    AuthApiError = Exception
+    AuthRetryableError = Exception
+
 from app.core.auth import (
     _build_user_workspaces,
     _login_response,
@@ -102,6 +109,16 @@ async def login(request: LoginRequest) -> LoginResponse:
         response = client.auth.sign_in_with_password(
             {"email": str(request.email), "password": request.password}
         )
+    except (AuthRetryableError, httpx.RequestError, httpx.HTTPError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Supabase authentication service is currently unavailable.",
+        ) from exc
+    except AuthApiError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password.",
+        ) from exc
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
