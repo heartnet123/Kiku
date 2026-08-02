@@ -3,15 +3,23 @@ import { getAuthToken, logout } from '../stores/workspace';
 
 const apiBaseUrl = (env.PUBLIC_API_BASE_URL ?? '').replace(/\/$/, '');
 
-export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
+export function apiUrl(path: string): string {
+	return apiBaseUrl + path;
+}
+
+export function authHeaders(): Record<string, string> {
 	const token = getAuthToken();
+	return token ? { Authorization: 'Bearer ' + token } : {};
+}
+
+export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
 	const headers: Record<string, string> = {
 		'Content-Type': 'application/json',
-		...(token ? { Authorization: `Bearer ${token}` } : {}),
+		...authHeaders(),
 		...((init?.headers as Record<string, string>) ?? {})
 	};
 
-	const response = await fetch(apiBaseUrl + path, {
+	const response = await fetch(apiUrl(path), {
 		...init,
 		headers
 	});

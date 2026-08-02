@@ -1,30 +1,33 @@
 import type { ChatSession, ChatMessage, ChatCitation } from './types';
+import { apiRequest, apiUrl, authHeaders } from '$lib/api/client';
+import { getCurrentWorkspaceId, logout } from '$lib/stores/workspace';
 
-const API_BASE = '/api/v1/workspaces/ws_acme/chat';
+function chatBasePath(): string {
+	const workspaceId = getCurrentWorkspaceId();
+	if (!workspaceId) {
+		throw new Error('Authentication required before using chat');
+	}
+	return '/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/chat';
+}
 
 export async function createSession(title: string = 'New Chat'): Promise<ChatSession> {
-	const res = await fetch(`${API_BASE}/sessions`, {
+	return apiRequest<ChatSession>(chatBasePath() + '/sessions', {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify({ title })
 	});
-	return res.json();
 }
 
 export async function listSessions(): Promise<ChatSession[]> {
-	const res = await fetch(`${API_BASE}/sessions`);
-	if (!res.ok) return [];
-	return res.json();
+	return apiRequest<ChatSession[]>(chatBasePath() + '/sessions');
 }
 
 export async function deleteSession(sessionId: string): Promise<void> {
-	await fetch(`${API_BASE}/sessions/${sessionId}`, { method: 'DELETE' });
+	await apiRequest(chatBasePath() + '/sessions/' + sessionId, { method: 'DELETE' });
 }
 
 export async function getMessages(sessionId: string): Promise<ChatMessage[]> {
-	const res = await fetch(`${API_BASE}/sessions/${sessionId}/messages`);
-	if (!res.ok) return [];
-	return res.json();
+	return apiRequest<ChatMessage[]>(chatBasePath() + '/sessions/' + sessionId + '/messages');
 }
 
 export async function streamChatMessage(
@@ -36,14 +39,26 @@ export async function streamChatMessage(
 	onDone: () => void,
 	signal?: AbortSignal
 ): Promise<void> {
-	const response = await fetch(`${API_BASE}/sessions/${sessionId}/stream`, {
+	const response = await fetch(apiUrl(chatBasePath() + '/sessions/' + sessionId + '/stream'), {
 		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
+		headers: { 'Content-Type': 'application/json', ...authHeaders() },
 		body: JSON.stringify({ query, category }),
 		signal
 	});
 
-	if (!response.body) return;
+	if (response.status === 401) {
+		logout();
+		throw new Error('UNAUTHORIZED: Authentication required or token expired');
+	}
+	if (response.status === 403) {
+		throw new Error('FORBIDDEN: Insufficient workspace permissions');
+	}
+	if (!response.ok) {
+		throw new Error('Chat stream failed with status ' + response.status);
+	}
+	if (!response.body) {
+		throw new Error('Chat stream returned an empty response body');
+	}
 	const reader = response.body.getReader();
 	const decoder = new TextDecoder('utf-8');
 	let buffer = '';
@@ -70,12 +85,16 @@ export async function streamChatMessage(
 				try {
 					const meta = JSON.parse(dataStr);
 					onMetadata(meta.citations || []);
-				} catch {}
+				} catch {
+					// Ignore malformed event payloads and continue streaming.
+				}
 			} else if (eventType === 'delta') {
 				try {
 					const delta = JSON.parse(dataStr);
 					onDelta(delta.content || '');
-				} catch {}
+				} catch {
+					// Ignore malformed event payloads and continue streaming.
+				}
 			} else if (eventType === 'done') {
 				onDone();
 			}
