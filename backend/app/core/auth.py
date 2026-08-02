@@ -10,65 +10,8 @@ from app.core.audit import record_audit_event
 from app.domain.identity import Role, User, Workspace, WorkspaceMember, hash_password, verify_password
 from app.services.supabase_client import create_supabase_client, response_data
 
-# Local demo fixtures remain available for unit tests and the development persona picker.
-DEMO_USERS = {
-    "user_acme_admin": User(
-        id="user_acme_admin",
-        email="admin@acme.com",
-        full_name="Acme Admin User",
-        password_hash=hash_password("admin123"),
-    ),
-    "user_acme_member": User(
-        id="user_acme_member",
-        email="member@acme.com",
-        full_name="Acme Team Member",
-        password_hash=hash_password("member123"),
-    ),
-    "user_globex_admin": User(
-        id="user_globex_admin",
-        email="admin@globex.com",
-        full_name="Globex Admin User",
-        password_hash=hash_password("admin123"),
-    ),
-}
-
-DEMO_WORKSPACES = {
-    "ws_acme": Workspace(id="ws_acme", name="Acme Team Workspace", slug="acme"),
-    "ws_globex": Workspace(id="ws_globex", name="Globex Corp Workspace", slug="globex"),
-}
-
-DEMO_MEMBERSHIPS: dict[tuple[str, str], WorkspaceMember] = {
-    (
-        "ws_acme",
-        "user_acme_admin",
-    ): WorkspaceMember(
-        workspace_id="ws_acme",
-        user_id="user_acme_admin",
-        role=Role.ADMIN,
-        joined_at="2026-01-01T00:00:00Z",
-    ),
-    (
-        "ws_acme",
-        "user_acme_member",
-    ): WorkspaceMember(
-        workspace_id="ws_acme",
-        user_id="user_acme_member",
-        role=Role.MEMBER,
-        joined_at="2026-01-15T00:00:00Z",
-    ),
-    (
-        "ws_globex",
-        "user_globex_admin",
-    ): WorkspaceMember(
-        workspace_id="ws_globex",
-        user_id="user_globex_admin",
-        role=Role.ADMIN,
-        joined_at="2026-02-01T00:00:00Z",
-    ),
-}
-
-_TOKENS: dict[str, str] = {}
 security = HTTPBearer(auto_error=False)
+
 
 
 def get_access_token(
@@ -112,27 +55,9 @@ def _user_from_auth_user(auth_user: Any, full_name: str | None = None) -> User:
     )
 
 
-def _build_demo_workspaces(user_id: str) -> list[dict[str, Any]]:
-    workspaces: list[dict[str, Any]] = []
-    for (workspace_id, member_id), membership in DEMO_MEMBERSHIPS.items():
-        if member_id != user_id:
-            continue
-        workspace = DEMO_WORKSPACES.get(workspace_id)
-        if workspace:
-            workspaces.append(
-                {
-                    "id": workspace.id,
-                    "name": workspace.name,
-                    "slug": workspace.slug,
-                    "role": membership.role,
-                }
-            )
-    return workspaces
-
-
 def _build_user_workspaces(user_id: str, client: Client | None = None) -> list[dict[str, Any]]:
     if client is None:
-        return _build_demo_workspaces(user_id)
+        return []
 
     membership_rows = response_data(
         client.table("workspace_members")
@@ -179,29 +104,6 @@ def _login_response(
     }
 
 
-def authenticate_user(email: str, password: str) -> tuple[User, str] | None:
-    """Authenticate only the local demo personas used by tests and development."""
-    for user in DEMO_USERS.values():
-        if user.email.lower() == email.lower() and verify_password(password, user.password_hash):
-            token = f"token_{user.id}_{secrets.token_urlsafe(32)}"
-            _TOKENS[token] = user.id
-            record_audit_event(
-                actor_id=user.id,
-                workspace_id="global",
-                action="AUTH_SUCCESS",
-                target_id=user.id,
-            )
-            return user, token
-
-    record_audit_event(
-        actor_id="anonymous",
-        workspace_id="global",
-        action="AUTH_FAILURE",
-        details={"attempted_email": email},
-    )
-    return None
-
-
 def _verify_supabase_token(token: str) -> User:
     client = create_supabase_client()
     if not client:
@@ -227,10 +129,7 @@ def _verify_supabase_token(token: str) -> User:
 
 
 def get_current_user(token: str = Depends(get_access_token)) -> User:
-    """Verify a Supabase JWT, with the local demo token as an explicit test fallback."""
-    user_id = _TOKENS.get(token)
-    if user_id and user_id in DEMO_USERS:
-        return DEMO_USERS[user_id]
+    """Verify a Supabase JWT."""
     return _verify_supabase_token(token)
 
 
@@ -249,25 +148,8 @@ def get_authenticated_member(
     access_token: str | None = None,
     required_role: Role | None = None,
 ) -> AuthenticatedMemberContext:
-    """Validate membership and role against Supabase or the explicit demo fixtures."""
-    demo_workspace = DEMO_WORKSPACES.get(workspace_id)
-    demo_membership = DEMO_MEMBERSHIPS.get((workspace_id, user.id))
-    if user.id in DEMO_USERS and not demo_membership:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Access denied. User '{user.email}' is not a member of workspace '{workspace_id}'.",
-        )
-    if demo_workspace and demo_membership:
-        if required_role == Role.ADMIN and demo_membership.role not in {Role.ADMIN, Role.OWNER}:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Access denied. Operation requires ADMIN role in workspace '{workspace_id}'.",
-            )
-        return AuthenticatedMemberContext(
-            user=user,
-            membership=demo_membership,
-            workspace=demo_workspace,
-        )
+    """Validate membership and role against Supabase."""
+
 
     if not access_token:
         raise HTTPException(

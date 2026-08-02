@@ -4,10 +4,10 @@ from app.core.auth import (
     _build_user_workspaces,
     _login_response,
     _user_from_auth_user,
-    authenticate_user,
     get_access_token,
     get_current_user,
 )
+
 from app.domain.identity import User
 from app.schemas.workspace import (
     LoginRequest,
@@ -90,12 +90,8 @@ async def register(request: RegisterRequest) -> LoginResponse:
 
 @router.post("/login", response_model=LoginResponse)
 async def login(request: LoginRequest) -> LoginResponse:
-    demo_result = authenticate_user(str(request.email), request.password)
-    if demo_result:
-        user, token = demo_result
-        return _login_response(token, None, user, _build_user_workspaces(user.id))
-
     client = create_supabase_client()
+
     if not client:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

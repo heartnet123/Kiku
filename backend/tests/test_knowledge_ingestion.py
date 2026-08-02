@@ -1,9 +1,12 @@
 import io
+from unittest.mock import patch
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 import pytest
 
 from app.core.audit import clear_audit_logs
-from app.core.auth import DEMO_MEMBERSHIPS, DEMO_USERS, _TOKENS
+from app.core.auth import AuthenticatedMemberContext
+from app.domain.identity import Role, User, Workspace, WorkspaceMember
 from app.domain.knowledge import FileType, SourceStatus
 from app.main import app
 from app.services.ingestion_pipeline import IngestionPipelineService, ingestion_service
@@ -12,38 +15,52 @@ from app.services.supabase_storage import storage_service
 client = TestClient(app)
 
 
+def _mock_verify_supabase_token(token: str) -> User:
+    if "admin" in token:
+        user_id = "user_globex_admin" if "globex" in token else "user_acme_admin"
+        email = "admin@globex.com" if "globex" in token else "admin@acme.com"
+        return User(id=user_id, email=email, full_name="Admin", password_hash="")
+    return User(id="user_acme_member", email="member@acme.com", full_name="Member", password_hash="")
+
+
+def _mock_get_authenticated_member(workspace_id: str, user: User, access_token: str | None = None, required_role: Role | None = None) -> AuthenticatedMemberContext:
+    is_globex_token = "globex" in (access_token or "")
+    if workspace_id == "ws_acme" and is_globex_token:
+        raise HTTPException(status_code=403, detail="Access denied")
+    if workspace_id == "ws_globex" and not is_globex_token:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    role = Role.MEMBER if ("member" in (access_token or "") and not is_globex_token) else Role.ADMIN
+    if required_role == Role.ADMIN and role != Role.ADMIN:
+        raise HTTPException(status_code=403, detail="Operation requires ADMIN role")
+
+    return AuthenticatedMemberContext(
+        user=user,
+        membership=WorkspaceMember(workspace_id=workspace_id, user_id=user.id, role=role, joined_at="2026-01-01T00:00:00Z"),
+        workspace=Workspace(id=workspace_id, name="Workspace", slug=workspace_id),
+    )
+
+
 @pytest.fixture(autouse=True)
-def reset_test_state():
-    users_snapshot = DEMO_USERS.copy()
-    memberships_snapshot = DEMO_MEMBERSHIPS.copy()
-    tokens_snapshot = _TOKENS.copy()
+def reset_test_state(monkeypatch):
+    monkeypatch.setattr("app.core.auth._verify_supabase_token", _mock_verify_supabase_token)
+    monkeypatch.setattr("app.core.auth.get_authenticated_member", _mock_get_authenticated_member)
+    monkeypatch.setattr("app.api.v1.routes.search.get_user_workspace_id", lambda user, token: "ws_globex" if "globex" in token else "ws_acme")
     storage_service.clear_all()
     clear_audit_logs()
 
     yield
 
-    DEMO_USERS.clear()
-    DEMO_USERS.update(users_snapshot)
-    DEMO_MEMBERSHIPS.clear()
-    DEMO_MEMBERSHIPS.update(memberships_snapshot)
-    _TOKENS.clear()
-    _TOKENS.update(tokens_snapshot)
     storage_service.clear_all()
     clear_audit_logs()
 
 
 def _get_admin_headers():
-    resp = client.post("/api/v1/auth/login", json={"email": "admin@acme.com", "password": "admin123"})
-    assert resp.status_code == 200
-    token = resp.json()["token"]
-    return {"Authorization": f"Bearer {token}"}
+    return {"Authorization": "Bearer token_admin_acme"}
 
 
 def _get_member_headers():
-    resp = client.post("/api/v1/auth/login", json={"email": "member@acme.com", "password": "member123"})
-    assert resp.status_code == 200
-    token = resp.json()["token"]
-    return {"Authorization": f"Bearer {token}"}
+    return {"Authorization": "Bearer token_member_acme"}
 
 
 def test_upload_authorization_and_status():
@@ -147,11 +164,7 @@ def test_failed_ingestion_and_actionable_retry():
 
 def test_versioning_and_workspace_isolation():
     admin_acme = _get_admin_headers()
-    
-    # Login as Globex admin
-    login_globex = client.post("/api/v1/auth/login", json={"email": "admin@globex.com", "password": "admin123"})
-    globex_token = login_globex.json()["token"]
-    admin_globex = {"Authorization": f"Bearer {globex_token}"}
+    admin_globex = {"Authorization": "Bearer token_admin_globex"}
 
     # Upload v1 to Acme
     files_v1 = {"file": ("handbook.txt", b"Acme handbook version 1 content.", "text/plain")}
@@ -190,3 +203,4 @@ def test_telemetry_metrics_endpoint():
     metrics = resp.json()
     assert "total_attempts" in metrics
     assert "by_type" in metrics
+

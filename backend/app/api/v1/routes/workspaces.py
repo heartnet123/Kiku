@@ -4,9 +4,6 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.auth import (
-    DEMO_MEMBERSHIPS,
-    DEMO_USERS,
-    DEMO_WORKSPACES,
     get_access_token,
     get_current_user,
 )
@@ -38,18 +35,6 @@ async def create_workspace(
     token: str = Depends(get_access_token),
 ) -> WorkspaceResponse:
     slug = _slugify(request.slug or request.name)
-    if user.id in DEMO_USERS:
-        workspace_id = f"ws_{uuid.uuid4().hex[:12]}"
-        workspace = Workspace(id=workspace_id, name=request.name.strip(), slug=slug)
-        DEMO_WORKSPACES[workspace_id] = workspace
-        DEMO_MEMBERSHIPS[(workspace_id, user.id)] = WorkspaceMember(
-            workspace_id=workspace_id,
-            user_id=user.id,
-            role=Role.ADMIN,
-            joined_at="2026-01-01T00:00:00Z",
-        )
-        return _response({"id": workspace.id, "name": workspace.name, "slug": workspace.slug}, Role.ADMIN)
-
     client = create_supabase_client(token)
     if not client:
         raise HTTPException(status_code=503, detail="Supabase connection is not configured.")
@@ -75,24 +60,8 @@ async def join_workspace(
     if not request.workspace_id and not request.slug:
         raise HTTPException(status_code=422, detail="workspace_id or slug is required.")
 
-    if user.id in DEMO_USERS:
-        workspace = DEMO_WORKSPACES.get(request.workspace_id or "")
-        if not workspace and request.slug:
-            workspace = next((item for item in DEMO_WORKSPACES.values() if item.slug == request.slug), None)
-        if not workspace:
-            raise HTTPException(status_code=404, detail="Workspace not found.")
-        DEMO_MEMBERSHIPS.setdefault(
-            (workspace.id, user.id),
-            WorkspaceMember(
-                workspace_id=workspace.id,
-                user_id=user.id,
-                role=Role.MEMBER,
-                joined_at="2026-01-01T00:00:00Z",
-            ),
-        )
-        return _response({"id": workspace.id, "name": workspace.name, "slug": workspace.slug}, Role.MEMBER)
-
     client = create_supabase_client(token)
+
     if not client:
         raise HTTPException(status_code=503, detail="Supabase connection is not configured.")
     function = "join_workspace_by_id" if request.workspace_id else "join_workspace_by_slug"

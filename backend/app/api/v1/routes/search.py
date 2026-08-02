@@ -1,14 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.auth import (
-    DEMO_MEMBERSHIPS,
-    DEMO_USERS,
     AuthenticatedMemberContext,
     get_access_token,
     get_authenticated_member,
     get_current_user,
     require_member,
 )
+
 from app.domain.identity import User
 from app.schemas.knowledge import SearchRequest, SearchResponse, SourceReferenceResponse, SourceResponse
 from app.services.knowledge_search import KnowledgeSearchService
@@ -82,15 +81,8 @@ async def search_knowledge(
 
 
 def get_user_workspace_id(user: User, token: str) -> str:
-    if user.id in DEMO_USERS:
-        workspace_ids = [workspace_id for (workspace_id, member_id) in DEMO_MEMBERSHIPS if member_id == user.id]
-        if len(workspace_ids) > 1:
-            raise HTTPException(status_code=409, detail="Multiple workspaces found. Use a workspace-scoped search endpoint.")
-        if not workspace_ids:
-            raise HTTPException(status_code=403, detail="No workspace membership found.")
-        return workspace_ids[0]
-
     client = create_supabase_client(token)
+
     if not client:
         raise HTTPException(status_code=503, detail="Supabase connection is not configured.")
     rows = response_data(
