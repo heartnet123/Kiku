@@ -8,6 +8,7 @@
 	import { onMount } from 'svelte';
 	import { listSessions, deleteSession, createSession } from '$lib/features/chat/chatApi';
 	import type { ChatSession } from '$lib/features/chat/types';
+	import { activeSessionStore } from '$lib/features/chat/chatStore';
 
 	type AppRoute = Parameters<typeof resolve>[0];
 	const navItems: { label: string; href: AppRoute; icon: IconName }[] = [
@@ -33,6 +34,7 @@
 		try {
 			const newSession = await createSession('New Chat');
 			sessions = [newSession, ...sessions];
+			activeSessionStore.set(newSession);
 		} catch {}
 	}
 
@@ -86,7 +88,13 @@
 			</div>
 			<div class="sessions-list">
 				{#each sessions as s (s.id)}
-					<div class="session-item">
+					<div
+						class="session-item"
+						role="button"
+						tabindex="0"
+						onclick={() => activeSessionStore.set(s)}
+						onkeydown={(e) => e.key === 'Enter' && activeSessionStore.set(s)}
+					>
 						<span class="session-title">{s.title}</span>
 						<button type="button" class="delete-chat-btn" onclick={(e) => handleDeleteChat(s.id, e)}>✕</button>
 					</div>

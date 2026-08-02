@@ -1,9 +1,10 @@
 <script lang="ts">
-	import type { ChatMessage, ChatCitation, ChatSession } from './types';
+	import type { ChatMessage, ChatCitation } from './types';
 	import { streamChatMessage, createSession, getMessages } from './chatApi';
 	import KikuMascot from '$lib/components/KikuMascot.svelte';
+	import { activeSessionStore } from './chatStore';
 
-	let { activeSession = $bindable<ChatSession | null>(null) } = $props();
+	let activeSession = $derived($activeSessionStore);
 
 	let messages = $state<ChatMessage[]>([]);
 	let query = $state('');
@@ -36,7 +37,7 @@
 		if (!currentSession) {
 			try {
 				currentSession = await createSession(userText.slice(0, 30));
-				activeSession = currentSession;
+				activeSessionStore.set(currentSession);
 			} catch {
 				return;
 			}

@@ -1,8 +1,5 @@
 <script lang="ts">
 	import ChatThread from '$lib/features/chat/ChatThread.svelte';
-	import type { ChatSession } from '$lib/features/chat/types';
-
-	let { activeSession = $bindable<ChatSession | null>(null) } = $props();
 </script>
 
 <svelte:head>
@@ -14,7 +11,7 @@
 </svelte:head>
 
 <div class="workspace-chat">
-	<ChatThread bind:activeSession />
+	<ChatThread />
 </div>
 
 <style>
