@@ -260,7 +260,9 @@ class KnowledgeSearchService:
                         synthesized_text = fallback
                         delta_data = json.dumps({"content": fallback})
                         yield f"event: delta\ndata: {delta_data}\n\n"
-        except Exception:
+                        error_data = json.dumps({"message": f"LLM returned status {response.status_code}"})
+                        yield f"event: error\ndata: {error_data}\n\n"
+        except Exception as exc:
             fallback = (
                 f"Based on knowledge sources: {matched_chunks[0]['text'][:200]}"
                 if matched_chunks
@@ -269,6 +271,8 @@ class KnowledgeSearchService:
             synthesized_text = fallback
             delta_data = json.dumps({"content": fallback})
             yield f"event: delta\ndata: {delta_data}\n\n"
+            error_data = json.dumps({"message": str(exc) or "LLM synthesis failed"})
+            yield f"event: error\ndata: {error_data}\n\n"
 
         # Record assistant message
         if session_id and synthesized_text:
