@@ -85,4 +85,42 @@ describe('chat API', () => {
 		expect(deltas).toEqual(['Hello']);
 		expect(done).toBe(true);
 	});
+
+	// G4: Verify onError callback fires for event:error SSE events
+	it('calls onError when the backend emits an error SSE event', async () => {
+		setAuthSession('token-test', user, [workspace]);
+		vi.stubGlobal(
+			'fetch',
+			vi.fn().mockResolvedValue(
+				new Response(
+					'event: metadata\ndata: {"citations":[]}\n\n' +
+						'event: delta\ndata: {"content":"Partial answer"}\n\n' +
+						'event: error\ndata: {"message":"LLM returned status 429"}\n\n' +
+						'event: done\ndata: {"status":"completed"}\n\n',
+					{ status: 200, headers: { 'Content-Type': 'text/event-stream' } }
+				)
+			)
+		);
+
+		const errors: string[] = [];
+		const deltas: string[] = [];
+		let done = false;
+
+		await streamChatMessage(
+			'session-1',
+			'What is Kiku?',
+			'All',
+			() => {},
+			(v) => deltas.push(v),
+			() => {
+				done = true;
+			},
+			undefined,
+			(msg) => errors.push(msg)
+		);
+
+		expect(errors).toEqual(['LLM returned status 429']);
+		expect(deltas).toEqual(['Partial answer']);
+		expect(done).toBe(true);
+	});
 });
