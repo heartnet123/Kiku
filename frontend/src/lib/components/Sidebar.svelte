@@ -5,6 +5,10 @@
 	import KikuMascot from '$lib/components/KikuMascot.svelte';
 	import { authStore, logout, switchWorkspace } from '../stores/workspace';
 
+	import { onMount } from 'svelte';
+	import { listSessions, deleteSession, createSession } from '$lib/features/chat/chatApi';
+	import type { ChatSession } from '$lib/features/chat/types';
+
 	type AppRoute = Parameters<typeof resolve>[0];
 	const navItems: { label: string; href: AppRoute; icon: IconName }[] = [
 		{ label: 'Home', href: '/', icon: 'home' },
@@ -15,6 +19,30 @@
 	];
 
 	let isDropdownOpen = $state(false);
+	let sessions = $state<ChatSession[]>([]);
+
+	onMount(async () => {
+		try {
+			sessions = await listSessions();
+		} catch {
+			sessions = [];
+		}
+	});
+
+	async function handleNewChat() {
+		try {
+			const newSession = await createSession('New Chat');
+			sessions = [newSession, ...sessions];
+		} catch {}
+	}
+
+	async function handleDeleteChat(id: string, event: MouseEvent) {
+		event.stopPropagation();
+		try {
+			await deleteSession(id);
+			sessions = sessions.filter((s) => s.id !== id);
+		} catch {}
+	}
 
 	function toggleDropdown() {
 		isDropdownOpen = !isDropdownOpen;
@@ -49,6 +77,21 @@
 			</div>
 			<div class="mascot-wrap mascot-small"><KikuMascot className="mascot" /></div>
 			<span class="card-arrow" aria-hidden="true">›</span>
+		</section>
+
+		<section class="chat-sessions-section">
+			<div class="sessions-header">
+				<span>Recent Chats</span>
+				<button type="button" class="new-chat-btn" onclick={handleNewChat}>+ New</button>
+			</div>
+			<div class="sessions-list">
+				{#each sessions as s (s.id)}
+					<div class="session-item">
+						<span class="session-title">{s.title}</span>
+						<button type="button" class="delete-chat-btn" onclick={(e) => handleDeleteChat(s.id, e)}>✕</button>
+					</div>
+				{/each}
+			</div>
 		</section>
 	</div>
 
@@ -313,6 +356,66 @@
 		margin-left: auto;
 		color: var(--color-muted);
 	}
+	.chat-sessions-section {
+		margin-top: 16px;
+	}
+	.sessions-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: 4px 8px;
+		font-size: 11px;
+		font-weight: 600;
+		color: var(--color-muted);
+		text-transform: uppercase;
+	}
+	.new-chat-btn {
+		background: transparent;
+		border: 1px solid #6366f1;
+		color: #6366f1;
+		padding: 2px 8px;
+		border-radius: 4px;
+		font-size: 10px;
+		font-weight: 600;
+		cursor: pointer;
+	}
+	.sessions-list {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		margin-top: 6px;
+		max-height: 180px;
+		overflow-y: auto;
+	}
+	.session-item {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: 6px 10px;
+		border-radius: var(--radius-control);
+		font-size: 12px;
+		color: var(--color-text);
+		background: var(--color-surface-raised);
+		cursor: pointer;
+	}
+	.session-title {
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		max-width: 170px;
+	}
+	.delete-chat-btn {
+		background: transparent;
+		border: none;
+		color: #ef4444;
+		font-size: 11px;
+		cursor: pointer;
+		opacity: 0.7;
+	}
+	.delete-chat-btn:hover {
+		opacity: 1;
+	}
+
 	@media (max-width: 900px) {
 		.sidebar {
 			width: 216px;
