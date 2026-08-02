@@ -48,7 +48,14 @@ async def create_workspace(
         raise HTTPException(status_code=400, detail="Unable to create workspace.") from exc
     if not rows:
         raise HTTPException(status_code=400, detail="Workspace creation returned no row.")
-    return _response(rows[0], Role.OWNER)
+    ws = rows[0]
+    try:
+        client.table("workspace_members").insert(
+            {"workspace_id": str(ws["id"]), "user_id": user.id, "role": "owner"}
+        ).execute()
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Unable to create workspace membership.") from exc
+    return _response(ws, Role.OWNER)
 
 
 @router.post("/join", response_model=WorkspaceResponse)
