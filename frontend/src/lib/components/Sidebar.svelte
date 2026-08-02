@@ -1,17 +1,15 @@
-<script lang="ts">
+	<script lang="ts">
+	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { resolve } from '$app/paths';
 	import Icon, { type IconName } from '$lib/components/Icon.svelte';
 	import KikuMascot from '$lib/components/KikuMascot.svelte';
+	import WorkspaceActions from './WorkspaceActions.svelte';
 	import { authStore, logout, switchWorkspace } from '../stores/workspace';
 
-	import { onMount } from 'svelte';
-	import { listSessions, deleteSession, createSession } from '$lib/features/chat/chatApi';
+	import { listSessions, deleteSession } from '$lib/features/chat/chatApi';
 	import type { ChatSession } from '$lib/features/chat/types';
-	import { activeSessionStore } from '$lib/features/chat/chatStore';
 
-	type AppRoute = Parameters<typeof resolve>[0];
-	const navItems: { label: string; href: AppRoute; icon: IconName }[] = [
+	const navItems: { label: string; href: string; icon: IconName }[] = [
 		{ label: 'Home', href: '/', icon: 'home' },
 		{ label: 'FAQs', href: '/faqs', icon: 'help' },
 		{ label: 'Sources', href: '/sources', icon: 'document' },
@@ -22,19 +20,19 @@
 	let isDropdownOpen = $state(false);
 	let sessions = $state<ChatSession[]>([]);
 
-	onMount(async () => {
-		try {
-			sessions = await listSessions();
-		} catch {
+	$effect(() => {
+		const isAuthenticated = $authStore.isAuthenticated;
+		const workspaceId = $authStore.currentWorkspace?.id;
+		if (!isAuthenticated || !workspaceId) {
 			sessions = [];
+			return;
 		}
+		void reloadSessions();
 	});
 
-	async function handleNewChat() {
+	async function reloadSessions() {
 		try {
-			const newSession = await createSession('New Chat');
-			sessions = [newSession, ...sessions];
-			activeSessionStore.set(newSession);
+			sessions = await listSessions();
 		} catch {}
 	}
 
@@ -43,6 +41,7 @@
 		try {
 			await deleteSession(id);
 			sessions = sessions.filter((s) => s.id !== id);
+			if (page.params.sessionId === id) await goto('/');
 		} catch {}
 	}
 
@@ -53,7 +52,7 @@
 
 <aside class="sidebar" aria-label="Main navigation">
 	<div class="sidebar-top">
-		<a class="brand" href={resolve('/')} aria-label="Kiku home">
+			<a class="brand" href="/" aria-label="Kiku home">
 			<img class="brand-icon" src="/kiku-icon.png" alt="" aria-hidden="true" />
 			<span>Kiku</span>
 		</a>
@@ -63,7 +62,7 @@
 				<a
 					class="nav-item"
 					class:active={isActive}
-					href={resolve(item.href)}
+						href={item.href}
 					aria-current={isActive ? 'page' : undefined}
 				>
 					<Icon name={item.icon} size={18} />
@@ -84,19 +83,26 @@
 		<section class="chat-sessions-section">
 			<div class="sessions-header">
 				<span>Recent Chats</span>
-				<button type="button" class="new-chat-btn" onclick={handleNewChat}>+ New</button>
+				<a class="new-chat-btn" href="/">+ New</a>
 			</div>
 			<div class="sessions-list">
 				{#each sessions as s (s.id)}
-					<div
-						class="session-item"
-						role="button"
-						tabindex="0"
-						onclick={() => activeSessionStore.set(s)}
-						onkeydown={(e) => e.key === 'Enter' && activeSessionStore.set(s)}
-					>
-						<span class="session-title">{s.title}</span>
-						<button type="button" class="delete-chat-btn" onclick={(e) => handleDeleteChat(s.id, e)}>✕</button>
+					<div class="session-item" class:active={page.params.sessionId === s.id}>
+						<a
+							class="session-link"
+							href={`/chat/${encodeURIComponent(s.id)}`}
+							aria-current={page.params.sessionId === s.id ? 'page' : undefined}
+						>
+							<span class="session-title">{s.title}</span>
+						</a>
+						<button
+							type="button"
+							class="delete-chat-btn"
+							aria-label={`Delete chat ${s.title}`}
+							onclick={(event) => handleDeleteChat(s.id, event)}
+						>
+							✕
+						</button>
 					</div>
 				{/each}
 			</div>
@@ -121,6 +127,7 @@
 						<span class="role-badge">{ws.role.toUpperCase()}</span>
 					</button>
 				{/each}
+				<WorkspaceActions />
 				<button
 					type="button"
 					class="dropdown-item logout-item"
@@ -378,14 +385,16 @@
 		text-transform: uppercase;
 	}
 	.new-chat-btn {
+		display: inline-flex;
+		align-items: center;
 		background: transparent;
-		border: 1px solid #6366f1;
-		color: #6366f1;
+		border: 1px solid var(--color-accent);
+		color: var(--color-accent);
 		padding: 2px 8px;
 		border-radius: 4px;
 		font-size: 10px;
 		font-weight: 600;
-		cursor: pointer;
+		text-decoration: none;
 	}
 	.sessions-list {
 		display: flex;
@@ -404,7 +413,17 @@
 		font-size: 12px;
 		color: var(--color-text);
 		background: var(--color-surface-raised);
-		cursor: pointer;
+		border: 1px solid transparent;
+	}
+	.session-item.active {
+		border-color: #eadffd;
+		background: var(--color-surface-soft);
+	}
+	.session-link {
+		min-width: 0;
+		flex: 1;
+		color: inherit;
+		text-decoration: none;
 	}
 	.session-title {
 		white-space: nowrap;
