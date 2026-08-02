@@ -44,9 +44,17 @@ def test_unauthenticated_request_rejected():
 
 
 def test_login_requires_supabase():
-    # Login attempt without Supabase configuration returns 503 or 401
-    resp = client.post("/api/v1/auth/login", json={"email": "user@example.com", "password": "wrongpassword"})
-    assert resp.status_code in (401, 503)
+    with patch("app.api.v1.routes.auth_routes.create_supabase_client", return_value=None):
+        resp = client.post("/api/v1/auth/login", json={"email": "user@example.com", "password": "wrongpassword"})
+        assert resp.status_code == 503
+
+
+def test_login_invalid_credentials():
+    supabase_mock = MagicMock()
+    supabase_mock.auth.sign_in_with_password.side_effect = Exception("Invalid login credentials")
+    with patch("app.api.v1.routes.auth_routes.create_supabase_client", return_value=supabase_mock):
+        resp = client.post("/api/v1/auth/login", json={"email": "user@example.com", "password": "wrongpassword"})
+        assert resp.status_code == 401
 
 
 def test_recursive_audit_sanitization():
@@ -56,8 +64,8 @@ def test_recursive_audit_sanitization():
             "token": "secret_token",
             "nested": {
                 "bearer": "secret_bearer",
-                "safe_field": "visible_value"
-            }
+                "safe_field": "visible_value",
+            },
         }
     }
     event = record_audit_event("user_1", "ws_acme", "TEST_EVENT", details=nested_payload)
@@ -80,5 +88,3 @@ def test_refresh_session_request_body():
 
     assert json_resp.status_code == 401
     supabase_mock.auth.refresh_session.assert_called_once_with("dummy_token")
-
-
