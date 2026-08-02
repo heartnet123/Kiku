@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 import os
+import re
 from typing import Any
 
 from app.domain.knowledge import (
@@ -155,22 +156,45 @@ class SupabaseStorageService:
                 "metadata": chunk.metadata,
             })
 
-    def search_chunks(self, workspace_id: str, query: str, top_k: int = 5) -> list[dict[str, Any]]:
-        """Retrieve matching chunks strictly scoped to workspace_id."""
+    def search_chunks(
+        self, workspace_id: str, query: str, category: str | None = None, top_k: int = 5
+    ) -> list[dict[str, Any]]:
+        """Retrieve matching chunks strictly scoped to workspace_id and optional category filter."""
         normalized = query.lower()
         matched = []
+
+        stop_words = {"what", "is", "the", "a", "an", "do", "i", "how", "to", "my", "in", "of", "for", "on", "with", "your", "can", "our", "are"}
+        query_words = [w for w in normalized.split() if w not in stop_words] or normalized.split()
+
+        target_cat = category.strip().lower() if category and category.strip().lower() != "all" else None
+        query_regexes = [re.compile(rf"\b{re.escape(w)}\b", re.IGNORECASE) for w in query_words]
+
         for chunk in self._chunks:
             if chunk["workspace_id"] != workspace_id:
                 continue
-            
+
+            metadata = chunk.get("metadata", {})
+            chunk_cat = metadata.get("category", "").lower()
+            source_title = metadata.get("source_title", "")
+
+            # Require exact match between chunk_cat and target_cat
+            if target_cat and chunk_cat != target_cat:
+                continue
+
             score = 0
-            text_lower = chunk["text"].lower()
-            query_words = normalized.split()
-            for word in query_words:
-                if word in text_lower:
+            text_content = chunk["text"]
+            location_content = chunk["location"]
+
+            for rx in query_regexes:
+                if rx.search(text_content):
+                    score += 2
+                if rx.search(source_title):
+                    score += 3
+                if rx.search(location_content):
                     score += 1
 
-            matched.append((score, chunk))
+            if score > 0:
+                matched.append((score, chunk))
 
         # Sort by score descending
         matched.sort(key=lambda x: x[0], reverse=True)

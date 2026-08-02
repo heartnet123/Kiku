@@ -11,46 +11,17 @@ class KnowledgeSearchService:
     def search(self, workspace_id: str, query: str, category: str | None = None) -> KnowledgeResult:
         normalized_query = query.strip() or "General inquiry"
 
-        # Query vector store for chunks matching workspace_id
-        matched_chunks = self.storage.search_chunks(workspace_id=workspace_id, query=normalized_query, top_k=5)
+        # Query vector store for chunks matching workspace_id and optional category filter
+        matched_chunks = self.storage.search_chunks(
+            workspace_id=workspace_id,
+            query=normalized_query,
+            category=category,
+            top_k=5,
+        )
         ready_sources_docs = [
             doc for doc in self.storage.list_sources(workspace_id)
             if doc.status == SourceStatus.READY
         ]
-
-        if matched_chunks:
-            top_chunk = matched_chunks[0]
-            source_id = top_chunk["source_id"]
-            version = top_chunk["source_version"]
-            location = top_chunk["location"]
-            snippet = top_chunk["text"][:300]
-            
-            source_doc = self.storage.get_source(workspace_id, source_id)
-            source_title = source_doc.title if source_doc else f"Source '{source_id}'"
-
-            citation = CitationDetail(
-                source_id=source_id,
-                title=source_title,
-                version=version,
-                location=location,
-                snippet=snippet,
-            )
-
-            answer = f"Based on {source_title} (v{version}, {location}): {top_chunk['text'][:150]}..."
-            details = f"Retrieved relevant knowledge from {source_title} ({location}): {top_chunk['text']}"
-            main_source_id = source_id
-        else:
-            # Fallback when no ingested chunks match
-            citation = CitationDetail(
-                source_id=f"{workspace_id}-default-source",
-                title="Workspace Overview",
-                version=1,
-                location="Section 1",
-                snippet="No custom knowledge source chunks indexed yet. Please add a Markdown, text, or PDF file under Sources.",
-            )
-            answer = f"No specific document matched your query '{normalized_query}' in workspace {workspace_id}."
-            details = "Add workspace knowledge sources via the Sources route to index custom policies and documentation."
-            main_source_id = f"{workspace_id}-default-source"
 
         sources_list: list[KnowledgeSource] = []
         for doc in ready_sources_docs:
@@ -60,34 +31,53 @@ class KnowledgeSearchService:
                     title=doc.title,
                     page=1,
                     updated_at=doc.updated_at,
-                    status=doc.status.value,
+                    status=doc.status.value if isinstance(doc.status, SourceStatus) else str(doc.status),
                     version=doc.current_version,
                 )
             )
 
-        if not sources_list:
-            sources_list.append(
-                KnowledgeSource(
-                    id=f"{workspace_id}-default-guide",
-                    title="Seeded Workspace Guide",
-                    page=1,
-                    updated_at="2026-01-01",
-                    status="ready",
-                    version=1,
-                )
+        if matched_chunks:
+            top_chunk = matched_chunks[0]
+            source_id = top_chunk["source_id"]
+            version = top_chunk["source_version"]
+            location = top_chunk["location"]
+            snippet = top_chunk["text"][:300]
+            
+            source_doc = self.storage.get_source(workspace_id, source_id)
+            source_title = source_doc.title if source_doc else top_chunk.get("metadata", {}).get("source_title", f"Source '{source_id}'")
+
+            citation = CitationDetail(
+                source_id=source_id,
+                title=source_title,
+                version=version,
+                location=location,
+                snippet=snippet,
             )
+
+            answer = f"Based on {source_title} ({location}): {top_chunk['text']}"
+            details = f"Retrieved relevant knowledge from {source_title} ({location}) in workspace {workspace_id}."
+            main_source_id = source_id
+            main_source_page = 1
+        else:
+            # Insufficient evidence behavior: return explicit no-evidence status without hard-coded fallbacks
+            citation = None
+            main_source_id = ""
+            main_source_page = 0
+            cat_suffix = f" in category '{category}'" if (category and category.strip().lower() != "all") else ""
+            answer = f"I couldn't find any relevant information in your workspace knowledge sources for '{normalized_query}'{cat_suffix}."
+            details = f"No matching document chunks were found in workspace '{workspace_id}'{cat_suffix}. Try rephrasing your query or adding relevant documents under Sources."
 
         return KnowledgeResult(
             query=normalized_query,
             answer=answer,
             details=details,
             source_id=main_source_id,
-            source_page=1,
+            source_page=main_source_page,
             sources=tuple(sources_list),
             related_faqs=(
                 "How do I upload new documents?",
+                "How do category filters work?",
                 "What file formats are supported?",
-                "How is content isolated across workspaces?",
             ),
             citation=citation,
         )

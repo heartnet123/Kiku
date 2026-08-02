@@ -1,6 +1,7 @@
 # Local tooling and runtime state
 .omx/
 .venv/
+docs/
 ROADMAP.html
 __pycache__/
 *.py[oc]

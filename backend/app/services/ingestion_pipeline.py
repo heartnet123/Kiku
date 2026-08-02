@@ -1,5 +1,6 @@
 import io
 import logging
+import re
 from typing import Any
 
 from llama_index.core import Document
@@ -122,9 +123,24 @@ class IngestionPipelineService:
             nodes = self.node_parser.get_nodes_from_documents(documents)
 
             # 3. Create ChunkLineage objects retaining exact workspace, source, version, and location lineage
+            def infer_category(title: str, path: str, text: str) -> str:
+                combined = f"{title} {path} {text}"
+                def match_words(words: tuple[str, ...]) -> bool:
+                    pattern = rf"\b({'|'.join(re.escape(w) for w in words)})\b"
+                    return bool(re.search(pattern, combined, re.IGNORECASE))
+
+                if match_words(("security", "2fa", "auth", "authentication", "encrypt", "encryption", "permission", "permissions", "password", "passwords")):
+                    return "Security"
+                if match_words(("billing", "expense", "expenses", "payment", "payments", "plan", "plans", "pricing", "invoice", "invoices", "cost", "costs")):
+                    return "Billing"
+                if match_words(("account", "accounts", "user", "users", "profile", "profiles", "login", "membership", "memberships")):
+                    return "Account"
+                return "Workspace"
+
             chunk_lineages: list[ChunkLineage] = []
             for idx, node in enumerate(nodes):
                 loc = node.metadata.get("location") or f"Chunk {idx+1}"
+                chunk_cat = infer_category(source_doc.title, source_doc.file_path, node.get_content())
                 chunk_lineages.append(
                     ChunkLineage(
                         workspace_id=workspace_id,
@@ -136,6 +152,7 @@ class IngestionPipelineService:
                             "source_title": source_doc.title,
                             "file_type": source_doc.file_type.value if isinstance(source_doc.file_type, FileType) else str(source_doc.file_type),
                             "chunk_index": idx,
+                            "category": chunk_cat,
                         },
                     )
                 )
