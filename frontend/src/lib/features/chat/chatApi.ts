@@ -37,7 +37,8 @@ export async function streamChatMessage(
 	onMetadata: (citations: ChatCitation[]) => void,
 	onDelta: (content: string) => void,
 	onDone: () => void,
-	signal?: AbortSignal
+	signal?: AbortSignal,
+	onError?: (message: string) => void
 ): Promise<void> {
 	const response = await fetch(apiUrl(chatBasePath() + '/sessions/' + sessionId + '/stream'), {
 		method: 'POST',
@@ -97,6 +98,13 @@ export async function streamChatMessage(
 				}
 			} else if (eventType === 'done') {
 				onDone();
+			} else if (eventType === 'error') {
+				try {
+					const err = JSON.parse(dataStr);
+					onError?.(err.message || 'Stream error');
+				} catch {
+					onError?.('Stream error');
+				}
 			}
 		}
 	}
