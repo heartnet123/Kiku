@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.auth import DEMO_MEMBERSHIPS, AuthenticatedMemberContext, get_current_user, require_member
 from app.domain.identity import User
@@ -60,10 +60,13 @@ async def search_knowledge(
 
 def get_user_workspace_id(user: User = Depends(get_current_user)) -> str:
     """Resolve the default workspace ID for an authenticated user."""
-    for (ws_id, u_id) in DEMO_MEMBERSHIPS:
-        if u_id == user.id:
-            return ws_id
-    return "ws_acme"
+    workspace_ids = [ws_id for (ws_id, user_id) in DEMO_MEMBERSHIPS if user_id == user.id]
+    if len(workspace_ids) > 1:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Multiple workspaces found. Use a workspace-scoped search endpoint.",
+        )
+    return workspace_ids[0] if workspace_ids else "ws_acme"
 
 
 def require_alias_member_context(

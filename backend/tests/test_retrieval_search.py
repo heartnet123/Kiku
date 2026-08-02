@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 
 from app.core.audit import clear_audit_logs
 from app.core.auth import DEMO_MEMBERSHIPS, DEMO_USERS, _TOKENS
+from app.domain.identity import Role, WorkspaceMember
 from app.domain.knowledge import FileType
 from app.main import app
 from app.services.supabase_storage import storage_service
@@ -187,3 +188,39 @@ def test_search_endpoint_contracts():
         json={"query": "engineering team"},
     )
     assert unauth_resp.status_code == 401
+
+
+def test_top_level_search_alias_handles_membership_selection_and_revocation():
+    """Verify the alias rejects ambiguous or revoked workspace memberships."""
+    member_headers = _get_member_headers()
+
+    DEMO_MEMBERSHIPS[("ws_globex", "user_acme_member")] = WorkspaceMember(
+        workspace_id="ws_globex",
+        user_id="user_acme_member",
+        role=Role.MEMBER,
+        joined_at="2026-03-01T00:00:00Z",
+    )
+
+    ambiguous_resp = client.post(
+        "/api/v1/search",
+        json={"query": "engineering team"},
+        headers=member_headers,
+    )
+    assert ambiguous_resp.status_code == 409
+
+    DEMO_MEMBERSHIPS.pop(("ws_acme", "user_acme_member"))
+    single_workspace_resp = client.post(
+        "/api/v1/search",
+        json={"query": "engineering team"},
+        headers=member_headers,
+    )
+    assert single_workspace_resp.status_code == 200
+    assert "ws_globex" in single_workspace_resp.json()["details"]
+
+    DEMO_MEMBERSHIPS.pop(("ws_globex", "user_acme_member"))
+    revoked_resp = client.post(
+        "/api/v1/search",
+        json={"query": "engineering team"},
+        headers=member_headers,
+    )
+    assert revoked_resp.status_code == 403

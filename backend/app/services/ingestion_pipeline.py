@@ -137,8 +137,6 @@ class IngestionPipelineService:
                     return "Account"
                 return "Workspace"
 
-            category = infer_category(source_doc.title, source_doc.file_path, "")
-
             chunk_lineages: list[ChunkLineage] = []
             for idx, node in enumerate(nodes):
                 loc = node.metadata.get("location") or f"Chunk {idx+1}"
