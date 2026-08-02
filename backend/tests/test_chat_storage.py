@@ -9,15 +9,13 @@ Two test functions:
 import uuid
 import pytest
 from app.core.config import settings
-from app.domain.chat import ChatSession, ChatMessage
 from app.services.chat_storage import ChatStorageService
 
 
 def test_chat_storage_crud_memory():
     """In-memory fallback: identical contract to the Supabase path, no network required."""
-    # Force in-memory by constructing a service with no Supabase client
-    storage = ChatStorageService()
-    storage.client = None  # override even if env has credentials
+    # Explicit test/demo dependency, never an implicit production fallback.
+    storage = ChatStorageService(in_memory=True)
     # Also reset shared dicts so this test is fully isolated
     storage._sessions = {}
     storage._messages = {}
@@ -31,23 +29,35 @@ def test_chat_storage_crud_memory():
     assert session.title == "Test Thread"
 
     # List sessions
-    sessions = storage.list_sessions(workspace_id=workspace_id)
+    sessions = storage.list_sessions(workspace_id=workspace_id, user_id=user_id)
     assert len(sessions) == 1
     assert sessions[0].id == session.id
 
     # Add messages
-    storage.add_message(session_id=session.id, workspace_id=workspace_id, role="user", content="Hello Kiku")
-    storage.add_message(session_id=session.id, workspace_id=workspace_id, role="assistant", content="Hi! How can I help?")
+    storage.add_message(
+        session_id=session.id,
+        workspace_id=workspace_id,
+        user_id=user_id,
+        role="user",
+        content="Hello Kiku",
+    )
+    storage.add_message(
+        session_id=session.id,
+        workspace_id=workspace_id,
+        user_id=user_id,
+        role="assistant",
+        content="Hi! How can I help?",
+    )
 
     # Retrieve messages
-    messages = storage.get_messages(session_id=session.id)
+    messages = storage.get_messages(session_id=session.id, workspace_id=workspace_id, user_id=user_id)
     assert len(messages) == 2
     assert messages[0].role == "user"
     assert messages[1].role == "assistant"
 
     # Delete session
-    storage.delete_session(session_id=session.id)
-    assert len(storage.list_sessions(workspace_id=workspace_id)) == 0
+    storage.delete_session(session_id=session.id, workspace_id=workspace_id, user_id=user_id)
+    assert len(storage.list_sessions(workspace_id=workspace_id, user_id=user_id)) == 0
 
 
 @pytest.mark.skipif(
@@ -74,13 +84,17 @@ def test_chat_storage_crud_supabase():
 
         # --- PERSIST: read back from a brand-new service instance ---
         svc_b = ChatStorageService()
-        sessions = svc_b.list_sessions(workspace_id=workspace_id)
+        sessions = svc_b.list_sessions(workspace_id=workspace_id, user_id=user_id)
         assert len(sessions) == 1
         assert sessions[0].id == session_id
 
         # --- ADD MESSAGES ---
         msg_user = svc_a.add_message(
-            session_id=session_id, workspace_id=workspace_id, role="user", content="Hello from integration test"
+            session_id=session_id,
+            workspace_id=workspace_id,
+            user_id=user_id,
+            role="user",
+            content="Hello from integration test",
         )
         assert msg_user.id  # DB-generated UUID
         assert msg_user.role == "user"
@@ -88,6 +102,7 @@ def test_chat_storage_crud_supabase():
         msg_asst = svc_a.add_message(
             session_id=session_id,
             workspace_id=workspace_id,
+            user_id=user_id,
             role="assistant",
             content="Integration reply",
             citations_json=[{"source_id": "src_1", "snippet": "test snippet"}],
@@ -96,29 +111,33 @@ def test_chat_storage_crud_supabase():
 
         # --- AUTO-TITLE: first user message should have updated session title ---
         svc_c = ChatStorageService()
-        fetched_session = svc_c.get_session(session_id=session_id)
+        fetched_session = svc_c.get_session(session_id=session_id, workspace_id=workspace_id, user_id=user_id)
         assert fetched_session is not None
         assert fetched_session.title == "Hello from integration test"
 
         # --- GET MESSAGES persists across instances ---
-        messages = svc_c.get_messages(session_id=session_id)
+        messages = svc_c.get_messages(session_id=session_id, workspace_id=workspace_id, user_id=user_id)
         assert len(messages) == 2
         assert messages[0].role == "user"
         assert messages[1].role == "assistant"
 
         # --- DELETE (cascade removes messages + citations automatically) ---
-        deleted = svc_a.delete_session(session_id=session_id)
+        deleted = svc_a.delete_session(session_id=session_id, workspace_id=workspace_id, user_id=user_id)
         assert deleted is True
         session_id = None  # mark as cleaned up
 
         # Confirm gone
-        assert svc_b.get_session(session_id=session.id) is None
-        assert svc_b.list_sessions(workspace_id=workspace_id) == []
+        assert svc_b.get_session(session_id=session.id, workspace_id=workspace_id, user_id=user_id) is None
+        assert svc_b.list_sessions(workspace_id=workspace_id, user_id=user_id) == []
 
     finally:
         # Safety cleanup — runs even if an assertion fails mid-test
         if session_id:
             try:
-                ChatStorageService().delete_session(session_id=session_id)
+                ChatStorageService().delete_session(
+                    session_id=session_id,
+                    workspace_id=workspace_id,
+                    user_id=user_id,
+                )
             except Exception:
                 pass

@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.core.auth import AuthenticatedMemberContext, require_member
 from app.services.chat_storage import ChatStorageService, chat_storage_service
 from app.services.knowledge_search import KnowledgeSearchService
+from app.services.supabase_storage import SupabaseStorageService
 
 router = APIRouter(prefix="/workspaces/{workspace_id}/chat", tags=["chat"])
 
@@ -44,6 +45,19 @@ class ChatMessageResponse(BaseModel):
     created_at: datetime
 
 
+def _storage(ctx: AuthenticatedMemberContext) -> ChatStorageService:
+    return ChatStorageService(client=ctx.supabase) if ctx.supabase is not None else chat_storage_service
+
+
+def _search_service(ctx: AuthenticatedMemberContext, storage: ChatStorageService) -> KnowledgeSearchService:
+    if ctx.supabase is None:
+        return KnowledgeSearchService(chat_storage=storage)
+    return KnowledgeSearchService(
+        storage=SupabaseStorageService(client=ctx.supabase, user_id=ctx.user.id),
+        chat_storage=storage,
+    )
+
+
 def _session_or_404(
     storage: ChatStorageService,
     workspace_id: str,
@@ -52,7 +66,7 @@ def _session_or_404(
 ):
     session = storage.get_session(session_id, workspace_id, ctx.user.id)
     if not session:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+        raise HTTPException(status_code=404, detail="Session not found")
     return session
 
 
@@ -74,7 +88,7 @@ async def create_session(
     req: CreateSessionRequest,
     ctx: AuthenticatedMemberContext = Depends(require_member),
 ):
-    return chat_storage_service.create_session(workspace_id, ctx.user.id, req.title.strip())
+    return _storage(ctx).create_session(workspace_id, ctx.user.id, req.title)
 
 
 @router.get("/sessions", response_model=list[ChatSessionResponse])
@@ -82,7 +96,7 @@ async def list_sessions(
     workspace_id: str,
     ctx: AuthenticatedMemberContext = Depends(require_member),
 ):
-    return chat_storage_service.list_sessions(workspace_id, ctx.user.id)
+    return _storage(ctx).list_sessions(workspace_id, ctx.user.id)
 
 
 @router.get("/sessions/{session_id}", response_model=ChatSessionResponse)
@@ -91,7 +105,7 @@ async def get_session(
     session_id: str,
     ctx: AuthenticatedMemberContext = Depends(require_member),
 ):
-    return _session_or_404(chat_storage_service, workspace_id, session_id, ctx)
+    return _session_or_404(_storage(ctx), workspace_id, session_id, ctx)
 
 
 @router.get("/sessions/{session_id}/messages", response_model=list[ChatMessageResponse])
@@ -100,9 +114,9 @@ async def get_messages(
     session_id: str,
     ctx: AuthenticatedMemberContext = Depends(require_member),
 ):
-    _session_or_404(chat_storage_service, workspace_id, session_id, ctx)
-    messages = chat_storage_service.get_messages(session_id, workspace_id, ctx.user.id)
-    return [_message_response(message) for message in messages]
+    storage = _storage(ctx)
+    _session_or_404(storage, workspace_id, session_id, ctx)
+    return [_message_response(message) for message in storage.get_messages(session_id, workspace_id, ctx.user.id)]
 
 
 @router.delete("/sessions/{session_id}")
@@ -111,8 +125,9 @@ async def delete_session(
     session_id: str,
     ctx: AuthenticatedMemberContext = Depends(require_member),
 ):
-    _session_or_404(chat_storage_service, workspace_id, session_id, ctx)
-    chat_storage_service.delete_session(session_id, workspace_id, ctx.user.id)
+    storage = _storage(ctx)
+    _session_or_404(storage, workspace_id, session_id, ctx)
+    storage.delete_session(session_id, workspace_id, ctx.user.id)
     return {"status": "deleted"}
 
 
@@ -123,9 +138,9 @@ async def stream_message(
     req: StreamMessageRequest,
     ctx: AuthenticatedMemberContext = Depends(require_member),
 ):
-    _session_or_404(chat_storage_service, workspace_id, session_id, ctx)
-    service = KnowledgeSearchService(chat_storage=chat_storage_service)
-    generator = service.stream_search(
+    storage = _storage(ctx)
+    _session_or_404(storage, workspace_id, session_id, ctx)
+    generator = _search_service(ctx, storage).stream_search(
         workspace_id=workspace_id,
         query=req.query,
         session_id=session_id,
@@ -135,9 +150,5 @@ async def stream_message(
     return StreamingResponse(
         generator,
         media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"},
     )

@@ -1,4 +1,5 @@
 import logging
+import re
 import httpx
 
 from app.core.config import settings
@@ -72,7 +73,7 @@ class KnowledgeSearchService:
                     if choices and "message" in choices[0]:
                         answer_text = choices[0]["message"].get("content", "").strip()
                         if answer_text:
-                            return answer_text
+                            return re.sub(r"\*\*(.*?)\*\*", r"\1", answer_text)
                 else:
                     logger.warning(
                         f"Opencode API returned non-200 status code {response.status_code}: {response.text[:200]}"
@@ -177,8 +178,14 @@ class KnowledgeSearchService:
         def event(name: str, payload: dict) -> str:
             return f"event: {name}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
 
+        def status_event(phase: str, message: str) -> str:
+            return event("status", {"status": phase, "phase": phase, "message": message})
+
         normalized_query = query.strip() or "General inquiry"
-        yield event("status", {"phase": "retrieving_sources", "message": "Searching workspace sources..."})
+        if session_id and not user_id:
+            raise ValueError("user_id is required when streaming into a chat session")
+
+        yield status_event("retrieving_sources", "Searching workspace sources...")
         matched_chunks = self.storage.search_chunks(
             workspace_id=workspace_id,
             query=normalized_query,
@@ -211,16 +218,17 @@ class KnowledgeSearchService:
             self.chat_storage.add_message(
                 session_id,
                 workspace_id,
+                user_id,
                 "user",
                 normalized_query,
             )
 
         history_parts: list[str] = []
         if session_id:
-            past_messages = self.chat_storage.get_messages(session_id)[-7:-1]
+            past_messages = self.chat_storage.get_messages(session_id, workspace_id, user_id)[-7:-1]
             history_parts = [f"{message.role.capitalize()}: {message.content}" for message in past_messages]
 
-        yield event("status", {"phase": "composing_answer", "message": "Preparing a grounded answer..."})
+        yield status_event("composing_answer", "Preparing a grounded answer...")
         endpoint = f"{self.api_base_url}/chat/completions"
         headers = {"Content-Type": "application/json"}
         if self.api_key:
@@ -252,7 +260,7 @@ class KnowledgeSearchService:
             "stream": True,
         }
 
-        yield event("status", {"phase": "streaming_answer", "message": "Writing the answer..."})
+        yield status_event("streaming_answer", "Writing the answer...")
         synthesized_text = ""
         failure_message: str | None = None
         try:
@@ -295,12 +303,13 @@ class KnowledgeSearchService:
             assistant_message = self.chat_storage.add_message(
                 session_id,
                 workspace_id,
+                user_id,
                 "assistant",
                 synthesized_text,
                 citations_json=citations_payload,
             )
 
-        yield event("status", {"phase": "completed", "message": "Answer complete."})
+        yield status_event("completed", "Answer complete.")
         yield event(
             "done",
             {

@@ -9,7 +9,12 @@ async def test_stream_search_yields_events():
     session = chat_storage_service.create_session("ws_acme", "user_1", "Stream Test")
     
     events = []
-    async for chunk in service.stream_search("ws_acme", "What is Kiku?", session_id=session.id):
+    async for chunk in service.stream_search(
+        "ws_acme",
+        "What is Kiku?",
+        session_id=session.id,
+        user_id="user_1",
+    ):
         events.append(chunk)
         
     assert len(events) >= 3

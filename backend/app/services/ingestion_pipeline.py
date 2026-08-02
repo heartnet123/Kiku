@@ -110,7 +110,7 @@ class IngestionPipelineService:
             raise ValueError(f"Source document '{source_id}' not found in workspace '{workspace_id}'")
 
         # Set status to PROCESSING
-        self.storage.update_source_status(source_id, SourceStatus.PROCESSING)
+        self.storage.update_source_status(source_id, SourceStatus.PROCESSING, workspace_id=workspace_id)
 
         try:
             file_content = self.storage.get_file(source_doc.file_path)
@@ -172,7 +172,7 @@ class IngestionPipelineService:
             )
 
             # 5. Transition status to READY
-            updated_doc = self.storage.update_source_status(source_id, SourceStatus.READY, reason=None)
+            updated_doc = self.storage.update_source_status(source_id, SourceStatus.READY, reason=None, workspace_id=workspace_id)
             logger.info(f"Ingestion successful for source '{source_id}' (v{source_doc.current_version})")
             return updated_doc or source_doc
 
@@ -180,7 +180,7 @@ class IngestionPipelineService:
             error_reason = str(err) or "Ingestion processing failed unexpectedly."
             logger.error(f"Ingestion failed for source '{source_id}': {error_reason}")
             updated_doc = self.storage.update_source_status(
-                source_id, SourceStatus.FAILED, reason=error_reason
+                source_id, SourceStatus.FAILED, reason=error_reason, workspace_id=workspace_id
             )
             return updated_doc or source_doc
 
