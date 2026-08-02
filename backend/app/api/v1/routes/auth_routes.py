@@ -12,6 +12,7 @@ from app.domain.identity import User
 from app.schemas.workspace import (
     LoginRequest,
     LoginResponse,
+    RefreshTokenRequest,
     RegisterRequest,
     UserResponse,
 )
@@ -142,7 +143,7 @@ async def get_me(
 
 
 @router.post("/refresh", response_model=LoginResponse)
-async def refresh_session(refresh_token: str) -> LoginResponse:
+async def refresh_session(request: RefreshTokenRequest) -> LoginResponse:
     client = create_supabase_client()
     if not client:
         raise HTTPException(
@@ -151,7 +152,7 @@ async def refresh_session(refresh_token: str) -> LoginResponse:
         )
 
     try:
-        response = client.auth.refresh_session(refresh_token)
+        response = client.auth.refresh_session(request.refresh_token)
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

@@ -7,6 +7,10 @@ class LoginRequest(BaseModel):
     password: str = Field(..., description="User password")
 
 
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str = Field(..., description="Supabase refresh token for session renewal")
+
+
 class RegisterRequest(BaseModel):
     email: EmailStr = Field(..., description="User email address")
     password: str = Field(..., min_length=8, max_length=128)

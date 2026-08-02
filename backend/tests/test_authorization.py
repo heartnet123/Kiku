@@ -215,3 +215,14 @@ def test_recursive_audit_sanitization():
     event = record_audit_event("user_1", "ws_acme", "TEST_EVENT", details=nested_payload)
     _assert_no_sensitive_keys_recursive(event.details)
     assert event.details["auth"]["nested"]["safe_field"] == "visible_value"
+
+
+def test_refresh_session_request_body():
+    # Test that bare query parameter is rejected with 422 Unprocessable Entity
+    query_resp = client.post("/api/v1/auth/refresh?refresh_token=dummy_token")
+    assert query_resp.status_code == 422
+
+    # Test that JSON body with refresh_token is accepted (returns 503 or 401 depending on Supabase config)
+    json_resp = client.post("/api/v1/auth/refresh", json={"refresh_token": "dummy_token"})
+    assert json_resp.status_code in (401, 503)
+
