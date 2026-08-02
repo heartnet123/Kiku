@@ -1,7 +1,9 @@
 from datetime import datetime, timezone
-import os
 import re
 from typing import Any
+from supabase import Client, create_client
+
+from app.core.config import settings
 
 from app.domain.knowledge import (
     ChunkLineage,
@@ -18,8 +20,13 @@ class SupabaseStorageService:
     """Persistence boundary for original files, metadata, versions, chunks, and telemetry metrics."""
 
     def __init__(self) -> None:
-        self.supabase_url = os.getenv("SUPABASE_URL")
-        self.supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
+        self.supabase_url = settings.supabase_url
+        self.supabase_key = settings.supabase_service_role_key or settings.supabase_key
+        self.client: Client | None = (
+            create_client(self.supabase_url, self.supabase_key)
+            if self.supabase_url and self.supabase_key
+            else None
+        )
         
         # In-memory storage for test/demo mode or when Supabase credentials are absent
         self._sources: dict[str, KnowledgeSourceDocument] = {}

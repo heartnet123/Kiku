@@ -3,6 +3,7 @@ import httpx
 
 from app.core.config import settings
 from app.domain.knowledge import CitationDetail, KnowledgeResult, KnowledgeSource, SourceStatus
+from app.services.chat_storage import ChatStorageService, chat_storage_service
 from app.services.supabase_storage import SupabaseStorageService, storage_service
 
 logger = logging.getLogger(__name__)
@@ -18,11 +19,13 @@ class KnowledgeSearchService:
         api_base_url: str = settings.opencode_api_base_url,
         api_key: str = settings.opencode_api_key,
         model: str = settings.opencode_llm_model,
+        chat_storage: ChatStorageService = chat_storage_service,
     ) -> None:
         self.storage = storage
         self.api_base_url = api_base_url.rstrip("/")
         self.api_key = api_key
         self.model = model
+        self.chat_storage = chat_storage
 
     def _synthesize_with_opencode(self, query: str, context_chunks: list[dict]) -> str | None:
         """Call Opencode OpenAI-compatible endpoint to synthesize an answer grounded in context."""
@@ -161,18 +164,29 @@ class KnowledgeSearchService:
         )
 
     async def stream_search(
-        self, workspace_id: str, query: str, session_id: str | None = None, category: str | None = None
+        self,
+        workspace_id: str,
+        query: str,
+        session_id: str | None = None,
+        user_id: str | None = None,
+        category: str | None = None,
     ):
-        """Async generator streaming SSE events (metadata, delta, done, error)."""
+        """Stream safe progress, grounded answer deltas, and persistence events."""
         import json
-        from app.services.chat_storage import chat_storage_service
+
+        def event(name: str, payload: dict) -> str:
+            return f"event: {name}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
 
         normalized_query = query.strip() or "General inquiry"
+        yield event("status", {"phase": "retrieving_sources", "message": "Searching workspace sources..."})
         matched_chunks = self.storage.search_chunks(
-            workspace_id=workspace_id, query=normalized_query, category=category, top_k=5
+            workspace_id=workspace_id,
+            query=normalized_query,
+            category=category,
+            top_k=5,
         )
 
-        citations_payload = []
+        citations_payload: list[dict] = []
         if matched_chunks:
             top_chunk = matched_chunks[0]
             source_doc = self.storage.get_source(workspace_id, top_chunk["source_id"])
@@ -181,105 +195,117 @@ class KnowledgeSearchService:
                 if source_doc
                 else top_chunk.get("metadata", {}).get("source_title", f"Source '{top_chunk['source_id']}'")
             )
-            citations_payload.append({
-                "source_id": top_chunk["source_id"],
-                "title": source_title,
-                "version": top_chunk["source_version"],
-                "location": top_chunk["location"],
-                "snippet": top_chunk["text"][:300],
-            })
+            citations_payload.append(
+                {
+                    "source_id": top_chunk["source_id"],
+                    "title": source_title,
+                    "version": top_chunk["source_version"],
+                    "location": top_chunk["location"],
+                    "snippet": top_chunk["text"][:300],
+                }
+            )
 
-        # Yield event: metadata
-        metadata_data = json.dumps({"citations": citations_payload, "query": normalized_query})
-        yield f"event: metadata\ndata: {metadata_data}\n\n"
+        yield event("metadata", {"citations": citations_payload, "query": normalized_query})
 
-        # Record user message if session_id provided
         if session_id:
-            chat_storage_service.add_message(session_id, workspace_id, "user", normalized_query)
+            self.chat_storage.add_message(
+                session_id,
+                workspace_id,
+                "user",
+                normalized_query,
+            )
 
-        # Call Opencode LLM synthesis stream (or fallback)
+        history_parts: list[str] = []
+        if session_id:
+            past_messages = self.chat_storage.get_messages(session_id)[-7:-1]
+            history_parts = [f"{message.role.capitalize()}: {message.content}" for message in past_messages]
+
+        yield event("status", {"phase": "composing_answer", "message": "Preparing a grounded answer..."})
+        endpoint = f"{self.api_base_url}/chat/completions"
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+
+        context_parts = [
+            f"[{idx + 1}] Source: {chunk.get('metadata', {}).get('source_title', chunk.get('source_id'))} "
+            f"({chunk.get('location')})\n{chunk.get('text')}"
+            for idx, chunk in enumerate(matched_chunks)
+        ]
+        context_str = "\n\n".join(context_parts) if context_parts else "No document chunks available."
+        history_str = "\n".join(history_parts) if history_parts else "No previous conversation."
+        payload = {
+            "model": self.model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a precise knowledge synthesis assistant. Answer strictly based on the provided context. "
+                        "If the context is insufficient, say so clearly."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": f"Context:\n{context_str}\n\nHistory:\n{history_str}\n\nQuestion: {normalized_query}",
+                },
+            ],
+            "temperature": 0.2,
+            "stream": True,
+        }
+
+        yield event("status", {"phase": "streaming_answer", "message": "Writing the answer..."})
         synthesized_text = ""
+        failure_message: str | None = None
         try:
-            endpoint = f"{self.api_base_url}/chat/completions"
-            headers = {"Content-Type": "application/json"}
-            if self.api_key:
-                headers["Authorization"] = f"Bearer {self.api_key}"
-
-            context_parts = [
-                f"[{idx+1}] Source: {c.get('metadata', {}).get('source_title', c.get('source_id'))} ({c.get('location')})\n{c.get('text')}"
-                for idx, c in enumerate(matched_chunks)
-            ]
-            context_str = "\n\n".join(context_parts) if context_parts else "No document chunks available."
-
-            history_parts = []
-            if session_id:
-                past_msgs = chat_storage_service.get_messages(session_id)[-6:-1]
-                for m in past_msgs:
-                    history_parts.append(f"{m.role.capitalize()}: {m.content}")
-            history_str = "\n".join(history_parts)
-
-            payload = {
-                "model": self.model,
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": "You are a precise knowledge synthesis assistant. Answer strictly based on provided context.",
-                    },
-                    {
-                        "role": "user",
-                        "content": f"Context:\n{context_str}\n\nHistory:\n{history_str}\n\nQuestion: {query}",
-                    },
-                ],
-                "temperature": 0.2,
-                "stream": True,
-            }
-
             async with httpx.AsyncClient(timeout=15.0) as client:
                 async with client.stream("POST", endpoint, json=payload, headers=headers) as response:
-                    if response.status_code == 200:
-                        async for line in response.aiter_lines():
-                            if line.startswith("data: "):
-                                data_str = line[6:].strip()
-                                if data_str == "[DONE]":
-                                    break
-                                try:
-                                    chunk_obj = json.loads(data_str)
-                                    delta = chunk_obj.get("choices", [{}])[0].get("delta", {}).get("content", "")
-                                    if delta:
-                                        synthesized_text += delta
-                                        delta_data = json.dumps({"content": delta})
-                                        yield f"event: delta\ndata: {delta_data}\n\n"
-                                except Exception:
-                                    pass
+                    if response.status_code != 200:
+                        failure_message = f"LLM returned status {response.status_code}"
                     else:
-                        fallback = (
-                            f"Based on knowledge sources: {matched_chunks[0]['text'][:200]}"
-                            if matched_chunks
-                            else "No relevant information found."
-                        )
-                        synthesized_text = fallback
-                        delta_data = json.dumps({"content": fallback})
-                        yield f"event: delta\ndata: {delta_data}\n\n"
-                        error_data = json.dumps({"message": f"LLM returned status {response.status_code}"})
-                        yield f"event: error\ndata: {error_data}\n\n"
+                        async for line in response.aiter_lines():
+                            if not line.startswith("data:"):
+                                continue
+                            data_str = line[5:].strip()
+                            if data_str == "[DONE]":
+                                break
+                            try:
+                                chunk_obj = json.loads(data_str)
+                                delta = chunk_obj.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                            except (TypeError, ValueError, IndexError, KeyError):
+                                continue
+                            if delta:
+                                synthesized_text += delta
+                                yield event("delta", {"content": delta})
+                        if not synthesized_text:
+                            failure_message = "LLM returned no answer content"
         except Exception as exc:
+            failure_message = str(exc) or "LLM synthesis failed"
+
+        if failure_message:
+            yield event("error", {"message": failure_message, "recoverable": True})
             fallback = (
                 f"Based on knowledge sources: {matched_chunks[0]['text'][:200]}"
                 if matched_chunks
-                else "No relevant information found."
+                else "No relevant information found in the workspace knowledge sources."
             )
             synthesized_text = fallback
-            delta_data = json.dumps({"content": fallback})
-            yield f"event: delta\ndata: {delta_data}\n\n"
-            error_data = json.dumps({"message": str(exc) or "LLM synthesis failed"})
-            yield f"event: error\ndata: {error_data}\n\n"
+            yield event("delta", {"content": fallback})
 
-        # Record assistant message
+        assistant_message = None
         if session_id and synthesized_text:
-            chat_storage_service.add_message(
-                session_id, workspace_id, "assistant", synthesized_text, citations_json=citations_payload
+            assistant_message = self.chat_storage.add_message(
+                session_id,
+                workspace_id,
+                "assistant",
+                synthesized_text,
+                citations_json=citations_payload,
             )
 
-        done_data = json.dumps({"status": "completed"})
-        yield f"event: done\ndata: {done_data}\n\n"
-
+        yield event("status", {"phase": "completed", "message": "Answer complete."})
+        yield event(
+            "done",
+            {
+                "status": "completed",
+                "message_id": assistant_message.id if assistant_message else None,
+                "fallback": failure_message is not None,
+            },
+        )

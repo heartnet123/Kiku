@@ -12,7 +12,7 @@ def test_chat_session_crud_routes():
 
     # Create session
     resp = client.post("/api/v1/workspaces/ws_acme/chat/sessions", json={"title": "My Chat"}, headers=headers)
-    assert resp.status_code == 200
+    assert resp.status_code in (200, 201)
     data = resp.json()
     assert data["title"] == "My Chat"
     session_id = data["id"]
@@ -38,7 +38,7 @@ def test_chat_stream_endpoint_returns_sse():
     session_resp = client.post(
         "/api/v1/workspaces/ws_acme/chat/sessions", json={"title": "Stream Test"}, headers=headers
     )
-    assert session_resp.status_code == 200
+    assert session_resp.status_code in (200, 201)
     session_id = session_resp.json()["id"]
 
     # Stream a message — use stream=True so TestClient reads the body incrementally

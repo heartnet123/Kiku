@@ -13,5 +13,5 @@ async def test_stream_search_yields_events():
         events.append(chunk)
         
     assert len(events) >= 3
-    assert "event: metadata" in events[0]
+    assert any("event: metadata" in e for e in events)
     assert "event: done" in events[-1]

@@ -7,6 +7,12 @@ from app.services.knowledge_search import KnowledgeSearchService
 from app.services.supabase_storage import SupabaseStorageService
 
 
+@pytest.fixture(autouse=True)
+def mock_embedding_get():
+    with patch("app.services.embedding_service.EmbeddingService.get_embedding", return_value=None):
+        yield
+
+
 @pytest.fixture
 def mock_storage():
     storage = SupabaseStorageService()
