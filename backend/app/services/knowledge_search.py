@@ -1,12 +1,83 @@
+import logging
+import httpx
+
+from app.core.config import settings
 from app.domain.knowledge import CitationDetail, KnowledgeResult, KnowledgeSource, SourceStatus
 from app.services.supabase_storage import SupabaseStorageService, storage_service
 
+logger = logging.getLogger(__name__)
+
 
 class KnowledgeSearchService:
-    """Workspace-scoped knowledge retrieval via LlamaIndex & Supabase vector store adapter."""
+    """Workspace-scoped knowledge retrieval via LlamaIndex & Supabase vector store adapter,
+    synthesized via Opencode LLM (deepseek-v4-flash-free)."""
 
-    def __init__(self, storage: SupabaseStorageService = storage_service) -> None:
+    def __init__(
+        self,
+        storage: SupabaseStorageService = storage_service,
+        api_base_url: str = settings.opencode_api_base_url,
+        api_key: str = settings.opencode_api_key,
+        model: str = settings.opencode_llm_model,
+    ) -> None:
         self.storage = storage
+        self.api_base_url = api_base_url.rstrip("/")
+        self.api_key = api_key
+        self.model = model
+
+    def _synthesize_with_opencode(self, query: str, context_chunks: list[dict]) -> str | None:
+        """Call Opencode OpenAI-compatible endpoint to synthesize an answer grounded in context."""
+        context_parts = []
+        for idx, chunk in enumerate(context_chunks, start=1):
+            source_title = chunk.get("metadata", {}).get("source_title", f"Source '{chunk.get('source_id')}'")
+            location = chunk.get("location", f"Chunk {idx}")
+            text = chunk.get("text", "")
+            context_parts.append(f"[{idx}] Source: {source_title} ({location})\n{text}")
+
+        context_str = "\n\n".join(context_parts)
+        endpoint = f"{self.api_base_url}/chat/completions"
+
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+
+        payload = {
+            "model": self.model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a precise knowledge synthesis assistant. "
+                        "Answer the user question based strictly on the provided context passages. "
+                        "If the context does not contain enough information, state clearly that you could not "
+                        "find sufficient evidence in the workspace documents. Keep your answer factual, direct, and helpful."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": f"Context:\n{context_str}\n\nQuestion: {query}",
+                },
+            ],
+            "temperature": 0.2,
+        }
+
+        try:
+            with httpx.Client(timeout=10.0) as client:
+                response = client.post(endpoint, json=payload, headers=headers)
+                if response.status_code == 200:
+                    data = response.json()
+                    choices = data.get("choices", [])
+                    if choices and "message" in choices[0]:
+                        answer_text = choices[0]["message"].get("content", "").strip()
+                        if answer_text:
+                            return answer_text
+                else:
+                    logger.warning(
+                        f"Opencode API returned non-200 status code {response.status_code}: {response.text[:200]}"
+                    )
+        except Exception as e:
+            logger.warning(f"Failed to call Opencode LLM synthesis endpoint: {str(e)}")
+
+        return None
 
     def search(self, workspace_id: str, query: str, category: str | None = None) -> KnowledgeResult:
         normalized_query = query.strip() or "General inquiry"
@@ -42,7 +113,7 @@ class KnowledgeSearchService:
             version = top_chunk["source_version"]
             location = top_chunk["location"]
             snippet = top_chunk["text"][:300]
-            
+
             source_doc = self.storage.get_source(workspace_id, source_id)
             source_title = source_doc.title if source_doc else top_chunk.get("metadata", {}).get("source_title", f"Source '{source_id}'")
 
@@ -54,8 +125,15 @@ class KnowledgeSearchService:
                 snippet=snippet,
             )
 
-            answer = f"Based on {source_title} ({location}): {top_chunk['text']}"
-            details = f"Retrieved relevant knowledge from {source_title} ({location}) in workspace {workspace_id}."
+            # Synthesize answer via Opencode LLM if available, fallback to grounded template
+            synthesized_answer = self._synthesize_with_opencode(normalized_query, matched_chunks)
+            if synthesized_answer:
+                answer = synthesized_answer
+                details = f"Synthesized answer via Opencode LLM ({self.model}) using knowledge from {source_title} ({location}) in workspace {workspace_id}."
+            else:
+                answer = f"Based on {source_title} ({location}): {top_chunk['text']}"
+                details = f"Retrieved relevant knowledge from {source_title} ({location}) in workspace {workspace_id}."
+
             main_source_id = source_id
             main_source_page = 1
         else:
