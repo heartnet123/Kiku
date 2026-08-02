@@ -18,24 +18,21 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
 		...authHeaders(),
 		...((init?.headers as Record<string, string>) ?? {})
 	};
-
-	const response = await fetch(apiUrl(path), {
-		...init,
-		headers
-	});
+	const response = await fetch(apiUrl(path), { ...init, headers });
 
 	if (response.status === 401) {
 		logout();
 		throw new Error('UNAUTHORIZED: Authentication required or token expired');
 	}
-
 	if (response.status === 403) {
 		throw new Error('FORBIDDEN: Insufficient workspace permissions');
 	}
-
 	if (!response.ok) {
-		throw new Error('API request failed with status ' + response.status);
+		const payload = await response.json().catch(() => null);
+		const detail = payload?.detail;
+		throw new Error(
+			typeof detail === 'string' ? detail : 'API request failed with status ' + response.status
+		);
 	}
-
 	return response.json() as Promise<T>;
 }
