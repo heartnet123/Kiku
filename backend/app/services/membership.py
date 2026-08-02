@@ -81,6 +81,8 @@ class WorkspaceMembershipService:
             raise HTTPException(status_code=404, detail="Member not found.")
         existing = rows[0]
         db_role = _db_role(new_role)
+        if new_role == Role.OWNER or db_role == "owner":
+            raise HTTPException(status_code=400, detail="Cannot assign OWNER role via update_member_role.")
         if existing["role"] == "owner" and db_role != "owner":
             raise HTTPException(status_code=400, detail="The workspace owner cannot be demoted.")
         updated = response_data(
@@ -92,6 +94,13 @@ class WorkspaceMembershipService:
         )
         if not updated:
             raise HTTPException(status_code=400, detail="Unable to update member role.")
+        record_audit_event(
+            actor_id,
+            workspace_id,
+            "MEMBER_ROLE_UPDATED",
+            target_id=target_user_id,
+            details={"old_role": existing["role"], "new_role": db_role},
+        )
         users = response_data(
             self.client.table("users").select("id,email,full_name").eq("id", target_user_id).execute()
         )
@@ -115,9 +124,21 @@ class WorkspaceMembershipService:
             raise HTTPException(status_code=404, detail="Member not found.")
         if rows[0]["role"] == "owner":
             raise HTTPException(status_code=400, detail="The workspace owner cannot be removed.")
-        self.client.table("workspace_members").delete().eq("workspace_id", workspace_id).eq(
-            "user_id", target_user_id
-        ).execute()
+        deleted = response_data(
+            self.client.table("workspace_members")
+            .delete()
+            .eq("workspace_id", workspace_id)
+            .eq("user_id", target_user_id)
+            .execute()
+        )
+        if not deleted:
+            raise HTTPException(status_code=400, detail="Unable to remove member.")
+        record_audit_event(
+            actor_id,
+            workspace_id,
+            "MEMBER_REMOVED",
+            target_id=target_user_id,
+        )
 
     def get_audit_logs(self, workspace_id: str) -> list[AuditLogEvent]:
         return get_workspace_audit_logs(workspace_id)
