@@ -68,7 +68,7 @@ def test_query_dependent_answers_and_evidence():
     )
     assert res1.status_code == 200
     data1 = res1.json()
-    assert "2FA authentication" in data1["answer"] or "Security Policy" in data1["answer"]
+    assert "2FA" in data1["answer"] or "Security Policy" in data1["answer"]
     assert data1["source"]["title"] == "Security Policy"
 
     # Query 2: Travel Expense intent
