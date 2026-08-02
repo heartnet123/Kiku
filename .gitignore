@@ -1,6 +1,7 @@
 # Local tooling and runtime state
 .omx/
 .venv/
+docs/plans/2026-08-02-retrieval-search-review-fixes.md
 ROADMAP.html
 __pycache__/
 *.py[oc]
