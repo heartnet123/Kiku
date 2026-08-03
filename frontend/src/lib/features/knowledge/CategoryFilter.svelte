@@ -34,35 +34,42 @@
 	.category {
 		min-height: 27px;
 		padding: 5px 14px;
-		border: 1px solid transparent;
+		border: 1px solid var(--color-border);
 		border-radius: var(--radius-pill);
-		color: #313852;
+		color: var(--color-text);
+		background: var(--color-surface);
 		cursor: pointer;
 		font-size: 11px;
 		font-weight: 500;
+		transition: transform 150ms ease, box-shadow 150ms ease;
 	}
 	.category:hover {
 		transform: translateY(-1px);
-		box-shadow: 0 4px 10px rgba(61, 43, 110, 0.08);
+		box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
 	}
 	.category.selected {
-		border-color: rgba(111, 63, 202, 0.12);
-		box-shadow: 0 4px 12px rgba(111, 63, 202, 0.12);
+		border-color: var(--color-accent);
+		box-shadow: 0 4px 12px var(--color-focus-ring);
 	}
 	.category-all {
-		background: #895ddd;
-		color: var(--color-heading);
+		background: var(--color-primary);
+		color: var(--color-primary-fg);
+		border-color: var(--color-primary);
 	}
 	.category-account {
-		background: #fff0e3;
+		background: var(--color-warning-soft);
+		color: var(--color-warning-fg);
 	}
 	.category-billing {
-		background: #ffe4e6;
+		background: var(--color-destructive-soft);
+		color: var(--color-destructive-fg);
 	}
 	.category-workspace {
-		background: #f0eaff;
+		background: var(--color-accent-soft);
+		color: var(--color-accent);
 	}
 	.category-security {
-		background: #e1f7f1;
+		background: var(--color-success-soft);
+		color: var(--color-success-fg);
 	}
 </style>

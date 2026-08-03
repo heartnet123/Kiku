@@ -295,15 +295,15 @@
 	.cite-card span { color: var(--color-muted); font-size: 11px; }
 	.cite-card .snippet { color: var(--color-subtle); font-style: italic; }
 	.live-status { min-height: 22px; margin-top: 14px; color: var(--color-muted); font-size: 12px; }
-	.error-state { margin-top: 8px; border: 1px solid #f2c9cf; border-radius: 10px; background: #fff4f5; padding: 10px 12px; color: #9f3846; font-size: 13px; }
+	.error-state { margin-top: 8px; border: 1px solid var(--color-destructive-border); border-radius: 10px; background: var(--color-destructive-soft); padding: 10px 12px; color: var(--color-destructive-fg); font-size: 13px; }
 	.input-bar-container { position: sticky; bottom: 0; width: min(100% - 48px, 960px); margin: auto auto 0; border-top: 1px solid var(--color-border); background: color-mix(in srgb, var(--color-bg) 92%, transparent); padding: 14px 0 18px; backdrop-filter: blur(10px); }
 	form { display: flex; align-items: flex-end; gap: 9px; }
 	textarea { min-height: 46px; max-height: 160px; flex: 1; resize: vertical; border: 1px solid var(--color-border-strong); border-radius: var(--radius-control); background: var(--color-surface); padding: 12px 14px; color: var(--color-text); outline: none; }
-	textarea:focus { border-color: var(--color-accent); box-shadow: 0 0 0 3px rgba(137, 93, 221, 0.12); }
+	textarea:focus { border-color: var(--color-accent); box-shadow: 0 0 0 3px var(--color-focus-ring); }
 	button { min-height: 46px; border: 0; border-radius: var(--radius-control); padding: 0 18px; cursor: pointer; font-weight: 650; }
 	button:disabled { cursor: not-allowed; opacity: 0.5; }
-	.send-btn { background: var(--color-accent); color: white; }
-	.stop-btn { background: #c9505d; color: white; }
+	.send-btn { background: var(--color-accent); color: var(--color-primary-fg); }
+	.stop-btn { background: var(--color-destructive); color: var(--color-primary-fg); }
 	.input-hint { margin: 6px 2px 0; color: var(--color-muted); font-size: 11px; }
 	@media (max-width: 640px) {
 		.chat-content, .input-bar-container { width: min(100% - 28px, 560px); }

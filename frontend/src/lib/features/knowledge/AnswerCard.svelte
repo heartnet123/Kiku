@@ -21,7 +21,7 @@
 			<strong>{result.source.title || result.source.id}</strong>
 			{#if result.source.version}
 				<span
-					class="source-version-tag rounded bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[10px] text-emerald-700"
+					class="source-version-tag rounded bg-success-soft px-1.5 py-0.5 font-mono text-[10px] text-success-fg border border-success-border"
 					>v{result.source.version}</span
 				>
 			{/if}
@@ -50,8 +50,8 @@
 		padding: 23px 24px 20px;
 		border: 1px solid var(--color-border);
 		border-radius: var(--radius-card);
-		background: #ffffff;
-		box-shadow: 0 5px 17px rgba(52, 41, 94, 0.035);
+		background: var(--color-surface);
+		box-shadow: 0 5px 17px rgba(0, 0, 0, 0.05);
 	}
 	.answer-header {
 		display: flex;
@@ -94,16 +94,16 @@
 		min-height: 43px;
 		margin-top: 18px;
 		padding: 8px 10px;
-		border: 1px solid #d7eee5;
+		border: 1px solid var(--color-success-border);
 		border-radius: var(--radius-control);
-		background: #f5fbf9;
+		background: var(--color-success-soft);
 		color: var(--color-text);
 		font-size: 11px;
 		text-decoration: none;
 	}
 	.source-chip:hover {
-		border-color: #adddca;
-		background: #eefaf5;
+		border-color: var(--color-success);
+		background: var(--color-surface-soft);
 	}
 	.document-icon {
 		display: grid;
@@ -144,7 +144,7 @@
 		flex: 0 0 30px;
 		place-items: center;
 		border-radius: var(--radius-control);
-		background: #f5f1ff;
+		background: var(--color-accent-soft);
 		color: var(--color-accent);
 	}
 	.source-row-copy {
