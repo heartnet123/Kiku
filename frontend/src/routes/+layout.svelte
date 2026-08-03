@@ -1,14 +1,22 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import AppShell from '$lib/components/AppShell.svelte';
-	import { rehydrateAuth } from '$lib/stores/auth';
+	import { initFromServer, rehydrateAuth } from '$lib/stores/auth';
 	import './layout.css';
 	import favicon from '$lib/assets/favicon.svg';
 
-	let { children } = $props();
+	let { children, data } = $props();
 
-	onMount(() => {
-		rehydrateAuth();
+	// Pre-hydrate store from SSR auth state (no network call needed for isAuthenticated).
+	// Workspaces are still fetched client-side via rehydrateAuth below.
+	if (data.authState) {
+		initFromServer(data.authState, []);
+	}
+
+	onMount(async () => {
+		// Always call rehydrateAuth to populate workspaces from /me.
+		// When SSR already set the cookie, /me succeeds without sessionStorage.
+		await rehydrateAuth();
 	});
 </script>
 

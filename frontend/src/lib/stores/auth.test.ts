@@ -32,7 +32,7 @@ describe('authStore and auto-refresh', () => {
 		expect(_decodeJwtExp('header.invalid-base64.signature')).toBeNull();
 	});
 
-	it('sets auth session, persists to sessionStorage, and populates workspace store', () => {
+	it('sets auth session and populates workspace store', () => {
 		setAuthSession(dummyJwt, user, [workspace], 'refresh-123');
 
 		const state = get(authStore);
@@ -108,5 +108,28 @@ describe('authStore and auto-refresh', () => {
 		const state = get(authStore);
 		expect(state.token).toBe('new-token');
 		expect(state.refreshToken).toBe('new-refresh');
+		vi.unstubAllGlobals();
+	});
+
+	it('setAuthSession does not write to sessionStorage', () => {
+		const mockSessionStorage = { setItem: vi.fn(), getItem: vi.fn(), removeItem: vi.fn() };
+		vi.stubGlobal('window', {});
+		vi.stubGlobal('sessionStorage', mockSessionStorage);
+		setAuthSession(dummyJwt, user, [workspace]);
+		expect(mockSessionStorage.setItem).not.toHaveBeenCalledWith('kiku_auth_token', expect.anything());
+		vi.unstubAllGlobals();
+	});
+
+	it('logout fires POST /api/v1/auth/logout', async () => {
+		const fetchSpy = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+		vi.stubGlobal('window', {});
+		vi.stubGlobal('fetch', fetchSpy);
+		logout();
+		await new Promise((r) => setTimeout(r, 0));
+		expect(fetchSpy).toHaveBeenCalledWith(
+			expect.stringContaining('/auth/logout'),
+			expect.objectContaining({ method: 'POST', credentials: 'include' })
+		);
+		vi.unstubAllGlobals();
 	});
 });

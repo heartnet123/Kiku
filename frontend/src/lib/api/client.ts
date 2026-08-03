@@ -18,7 +18,7 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
 		...authHeaders(),
 		...((init?.headers as Record<string, string>) ?? {})
 	};
-	const response = await fetch(apiUrl(path), { ...init, headers });
+	const response = await fetch(apiUrl(path), { ...init, headers, credentials: 'include' });
 
 	if (response.status === 401) {
 		logout();

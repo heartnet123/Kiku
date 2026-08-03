@@ -60,29 +60,21 @@ export function setAuthSession(
 		tokenExpiresAt: expiresAt
 	});
 
-	if (typeof window !== 'undefined') {
-		sessionStorage.setItem('kiku_auth_token', token);
-		if (refreshToken) sessionStorage.setItem('kiku_refresh_token', refreshToken);
-		else sessionStorage.removeItem('kiku_refresh_token');
-	}
-
 	setWorkspaces(workspaces);
 	_scheduleTokenRefresh();
 }
 
-export function logout() {
+export function logout(): void {
 	if (refreshTimeout) {
 		clearTimeout(refreshTimeout);
 		refreshTimeout = null;
 	}
 
 	authStore.set({ ...initialAuth, isRehydrating: false });
-	if (typeof window !== 'undefined') {
-		sessionStorage.removeItem('kiku_auth_token');
-		sessionStorage.removeItem('kiku_refresh_token');
-	}
-
 	clearWorkspaces();
+	if (typeof window !== 'undefined') {
+		void fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'include' });
+	}
 }
 
 async function _doRefresh() {
@@ -142,33 +134,17 @@ export async function rehydrateAuth(): Promise<void> {
 		return;
 	}
 
-	const storedToken = sessionStorage.getItem('kiku_auth_token');
-	const storedRefreshToken = sessionStorage.getItem('kiku_refresh_token');
-	if (!storedToken) {
-		authStore.update((state) => ({ ...state, isRehydrating: false }));
-		return;
-	}
-
 	try {
-		authStore.update((state) => ({
-			...state,
-			token: storedToken,
-			refreshToken: storedRefreshToken
-		}));
 		const response = await apiRequest<{
 			token: string;
 			user: UserProfile;
 			workspaces: WorkspaceItem[];
 		}>('/api/v1/auth/me');
 
-		setAuthSession(
-			response.token || storedToken,
-			response.user,
-			response.workspaces,
-			storedRefreshToken
-		);
+		setAuthSession(response.token, response.user, response.workspaces, null);
 	} catch {
-		logout();
+		authStore.update((state) => ({ ...state, isRehydrating: false }));
+		clearWorkspaces();
 	}
 }
 
@@ -178,4 +154,11 @@ export function getAuthToken(): string | null {
 
 export function getCurrentUser(): UserProfile | null {
 	return get(authStore).user;
+}
+
+export function initFromServer(serverState: AuthState, workspaces: WorkspaceItem[]): void {
+	if (!serverState.isAuthenticated) return;
+	authStore.set(serverState);
+	setWorkspaces(workspaces);
+	_scheduleTokenRefresh();
 }
