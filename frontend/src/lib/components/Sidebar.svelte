@@ -4,7 +4,7 @@
 	import Icon, { type IconName } from '$lib/components/Icon.svelte';
 	import KikuMascot from '$lib/components/KikuMascot.svelte';
 	import WorkspaceActions from './WorkspaceActions.svelte';
-	import { authStore, logout } from '../stores/auth';
+	import { authStore, logout, openLoginModal, requireAuth } from '../stores/auth';
 	import { workspaceStore, switchWorkspace } from '../stores/workspace';
 
 	import { listSessions, deleteSession } from '$lib/features/chat/chatApi';
@@ -39,14 +39,20 @@
 
 	async function handleDeleteChat(id: string, event: MouseEvent) {
 		event.stopPropagation();
-		try {
-			await deleteSession(id);
-			sessions = sessions.filter((s) => s.id !== id);
-			if (page.params.sessionId === id) await goto('/');
-		} catch {}
+		requireAuth(async () => {
+			try {
+				await deleteSession(id);
+				sessions = sessions.filter((s) => s.id !== id);
+				if (page.params.sessionId === id) await goto('/');
+			} catch {}
+		});
 	}
 
 	function toggleDropdown() {
+		if (!$authStore.isAuthenticated && !$authStore.isRehydrating) {
+			openLoginModal();
+			return;
+		}
 		isDropdownOpen = !isDropdownOpen;
 	}
 </script>

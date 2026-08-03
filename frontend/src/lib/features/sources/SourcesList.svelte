@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { fetchSourceVersions, retryWorkspaceSource } from './api';
 	import type { IngestionMetrics, SourceItem, SourceVersion } from './types';
+	import { requireAuth } from '$lib/stores/auth';
 
 	interface Props {
 		workspaceId: string;
@@ -17,16 +18,18 @@
 	let actionError = $state<string | null>(null);
 
 	async function handleRetry(sourceId: string) {
-		retryingSourceId = sourceId;
-		actionError = null;
-		try {
-			await retryWorkspaceSource(workspaceId, sourceId);
-			onRefresh();
-		} catch (err: unknown) {
-			actionError = err instanceof Error ? err.message : 'Retry failed.';
-		} finally {
-			retryingSourceId = null;
-		}
+		requireAuth(async () => {
+			retryingSourceId = sourceId;
+			actionError = null;
+			try {
+				await retryWorkspaceSource(workspaceId, sourceId);
+				onRefresh();
+			} catch (err: unknown) {
+				actionError = err instanceof Error ? err.message : 'Retry failed.';
+			} finally {
+				retryingSourceId = null;
+			}
+		});
 	}
 
 	async function handleViewVersions(sourceId: string) {

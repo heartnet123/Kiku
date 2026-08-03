@@ -44,6 +44,42 @@ export function _decodeJwtExp(token: string): number | null {
 	}
 }
 
+export interface AuthModalState {
+	isOpen: boolean;
+	pendingAction: (() => void | Promise<void>) | null;
+}
+
+const initialModalState: AuthModalState = {
+	isOpen: false,
+	pendingAction: null
+};
+
+export const authModalStore = writable<AuthModalState>(initialModalState);
+
+export function openLoginModal(onSuccess?: () => void | Promise<void>): void {
+	authModalStore.set({
+		isOpen: true,
+		pendingAction: onSuccess ?? null
+	});
+}
+
+export function closeLoginModal(): void {
+	authModalStore.set({
+		isOpen: false,
+		pendingAction: null
+	});
+}
+
+export function requireAuth(action: () => void | Promise<void>): boolean {
+	const state = get(authStore);
+	if (state.isAuthenticated) {
+		void action();
+		return true;
+	}
+	openLoginModal(action);
+	return false;
+}
+
 export function setAuthSession(
 	token: string,
 	user: UserProfile,
@@ -62,6 +98,13 @@ export function setAuthSession(
 
 	setWorkspaces(workspaces);
 	_scheduleTokenRefresh();
+
+	const modalState = get(authModalStore);
+	const pending = modalState.pendingAction;
+	closeLoginModal();
+	if (pending) {
+		void pending();
+	}
 }
 
 export function logout(): void {

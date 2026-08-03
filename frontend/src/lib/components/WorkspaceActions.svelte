@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { createWorkspace, joinWorkspace } from '$lib/features/workspaces/api';
 	import { addWorkspace } from '$lib/stores/workspace';
+	import { requireAuth } from '$lib/stores/auth';
 
 	let mode = $state<'create' | 'join' | null>(null);
 	let name = $state('');
@@ -9,32 +10,40 @@
 	let errorMessage = $state('');
 	let isLoading = $state(false);
 
+	function setMode(targetMode: 'create' | 'join') {
+		requireAuth(() => {
+			mode = targetMode;
+		});
+	}
+
 	async function submit(event: SubmitEvent) {
 		event.preventDefault();
-		errorMessage = '';
-		isLoading = true;
-		try {
-			const workspace =
-				mode === 'create' ? await createWorkspace(name, slug) : await joinWorkspace(identifier);
-			addWorkspace(workspace);
-			mode = null;
-			name = '';
-			slug = '';
-			identifier = '';
-		} catch (error: unknown) {
-			errorMessage = error instanceof Error ? error.message : 'Workspace action failed.';
-		} finally {
-			isLoading = false;
-		}
+		requireAuth(async () => {
+			errorMessage = '';
+			isLoading = true;
+			try {
+				const workspace =
+					mode === 'create' ? await createWorkspace(name, slug) : await joinWorkspace(identifier);
+				addWorkspace(workspace);
+				mode = null;
+				name = '';
+				slug = '';
+				identifier = '';
+			} catch (error: unknown) {
+				errorMessage = error instanceof Error ? error.message : 'Workspace action failed.';
+			} finally {
+				isLoading = false;
+			}
+		});
 	}
 </script>
 
 <div class="workspace-actions">
 	<div class="workspace-action-buttons">
-		<button type="button" class="workspace-action" onclick={() => (mode = 'create')}
+		<button type="button" class="workspace-action" onclick={() => setMode('create')}
 			>+ Create workspace</button
 		>
-		<button type="button" class="workspace-action" onclick={() => (mode = 'join')}
+		<button type="button" class="workspace-action" onclick={() => setMode('join')}
 			>Join workspace</button
 		>
 	</div>

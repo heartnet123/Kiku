@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { workspaceStore } from '$lib/stores/workspace';
+	import { requireAuth } from '$lib/stores/auth';
 	import { fetchSourceMetrics, fetchWorkspaceSources } from '$lib/features/sources/api';
 	import type { IngestionMetrics, SourceItem } from '$lib/features/sources/types';
 	import SourcesList from '$lib/features/sources/SourcesList.svelte';
@@ -43,6 +44,12 @@
 			isLoading = false;
 		}
 	}
+
+	function handleAddSource() {
+		requireAuth(() => {
+			isUploadModalOpen = true;
+		});
+	}
 </script>
 
 <div class="min-h-screen bg-slate-950 p-6 text-slate-100 md:p-10">
@@ -76,7 +83,7 @@
 
 			<div class="flex items-center gap-3">
 				<button
-					onclick={loadData}
+					onclick={() => loadData()}
 					disabled={isLoading}
 					class="flex items-center gap-2 rounded-xl border border-white/10 bg-slate-900 px-4 py-2.5 text-sm font-semibold text-slate-300 transition hover:bg-slate-800 hover:text-white disabled:opacity-50"
 				>
@@ -96,7 +103,7 @@
 					Refresh
 				</button>
 				<button
-					onclick={() => (isUploadModalOpen = true)}
+					onclick={handleAddSource}
 					class="flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition hover:bg-indigo-500"
 				>
 					<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Sidebar from './Sidebar.svelte';
 	import LoginModal from './LoginModal.svelte';
-	import { authStore } from '../stores/auth';
+	import { authModalStore } from '../stores/auth';
 
 	let { children } = $props();
 </script>
@@ -12,7 +12,7 @@
 		{@render children()}
 	</main>
 
-	{#if !$authStore.isAuthenticated && !$authStore.isRehydrating}
+	{#if $authModalStore.isOpen}
 		<LoginModal />
 	{/if}
 </div>

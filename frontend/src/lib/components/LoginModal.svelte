@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { apiRequest } from '../api/client';
-	import { rehydrateAuth, setAuthSession } from '../stores/auth';
+	import { closeLoginModal, rehydrateAuth, setAuthSession } from '../stores/auth';
 	import type { WorkspaceItem, UserProfile } from '../stores/workspace';
 
 	let mode = $state<'login' | 'register'>('login');
@@ -66,8 +66,16 @@
 	aria-labelledby="auth-title"
 >
 	<div
-		class="w-full max-w-md rounded-xl border border-slate-800 bg-slate-900 p-6 text-slate-100 shadow-2xl"
+		class="relative w-full max-w-md rounded-xl border border-slate-800 bg-slate-900 p-6 text-slate-100 shadow-2xl"
 	>
+		<button
+			type="button"
+			class="absolute right-4 top-4 rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white"
+			onclick={closeLoginModal}
+			aria-label="Close auth dialog"
+		>
+			✕
+		</button>
 		<div class="mb-5 flex items-center gap-3">
 			<div
 				class="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-600 text-lg font-bold text-white"

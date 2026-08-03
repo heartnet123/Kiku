@@ -8,6 +8,7 @@
 		type ChatStatus
 	} from './chatApi';
 	import { consumeInitialQuery, storeInitialQuery } from './initialQuery';
+	import { requireAuth } from '$lib/stores/auth';
 	import type { ChatMessage } from './types';
 
 	let { sessionId = null }: { sessionId?: string | null } = $props();
@@ -60,20 +61,23 @@
 	async function handleSend() {
 		if (!query.trim() || isStreaming) return;
 		const userText = query.trim();
-		query = '';
 
-		if (!sessionId) {
-			try {
-				const session = await createSession(userText.slice(0, 80));
-				storeInitialQuery(session.id, userText);
-				await goto(`/chat/${encodeURIComponent(session.id)}`);
-			} catch (error) {
-				errorMessage = error instanceof Error ? error.message : 'Unable to start a chat.';
+		requireAuth(async () => {
+			query = '';
+
+			if (!sessionId) {
+				try {
+					const session = await createSession(userText.slice(0, 80));
+					storeInitialQuery(session.id, userText);
+					await goto(`/chat/${encodeURIComponent(session.id)}`);
+				} catch (error) {
+					errorMessage = error instanceof Error ? error.message : 'Unable to start a chat.';
+				}
+				return;
 			}
-			return;
-		}
 
-		await streamForSession(sessionId, userText);
+			await streamForSession(sessionId, userText);
+		});
 	}
 
 	async function streamForSession(currentSessionId: string, userText: string) {
