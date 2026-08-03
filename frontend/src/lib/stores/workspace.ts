@@ -59,6 +59,7 @@ export function clearWorkspaces() {
 	workspaceStore.set(initialWorkspaceState);
 }
 
-export function getCurrentWorkspaceId(): string | null {
-	return get(workspaceStore).currentWorkspace?.id ?? null;
+export function getCurrentWorkspaceId(): string {
+	const state = get(workspaceStore);
+	return state.currentWorkspace?.id || (state.workspaces.length > 0 ? state.workspaces[0].id : '');
 }

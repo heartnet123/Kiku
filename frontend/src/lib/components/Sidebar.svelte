@@ -167,7 +167,7 @@
 					{#if $authStore.isRehydrating}
 						Loading...
 					{:else if $authStore.isAuthenticated}
-						{$workspaceStore.currentWorkspace?.name ?? 'Default Workspace'}
+						{$workspaceStore.currentWorkspace?.name ?? 'No Workspace'}
 					{:else}
 						Sign In Required
 					{/if}

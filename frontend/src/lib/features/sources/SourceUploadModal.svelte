@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { uploadWorkspaceSource } from './api';
+	import { getCurrentWorkspaceId } from '$lib/stores/workspace';
 	import type { SourceItem } from './types';
 
 	interface Props {
@@ -48,7 +49,8 @@
 		errorMessage = null;
 
 		try {
-			const source = await uploadWorkspaceSource(workspaceId, selectedFile);
+			const activeId = workspaceId || getCurrentWorkspaceId();
+			const source = await uploadWorkspaceSource(activeId, selectedFile);
 			onUploaded(source);
 			onClose();
 			selectedFile = null;

@@ -23,7 +23,10 @@ export async function searchKnowledge(
 	category: string,
 	workspaceId?: string
 ): Promise<KnowledgeSearchResult> {
-	const activeWorkspaceId = workspaceId || getCurrentWorkspaceId() || 'ws_acme';
+	const activeWorkspaceId = workspaceId || getCurrentWorkspaceId();
+	if (!activeWorkspaceId) {
+		throw new Error('Workspace ID is required to search knowledge sources.');
+	}
 	const result = await apiRequest<SearchResponseDto>(
 		`/api/v1/workspaces/${activeWorkspaceId}/search`,
 		{

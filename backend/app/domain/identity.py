@@ -46,6 +46,9 @@ class Workspace:
     id: str
     name: str
     slug: str
+    owner_id: str | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
 
 
 @dataclass(frozen=True)

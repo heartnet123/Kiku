@@ -4,7 +4,8 @@ import { getAuthToken, logout } from '../stores/auth';
 const apiBaseUrl = (env.PUBLIC_API_BASE_URL ?? '').replace(/\/$/, '');
 
 export function apiUrl(path: string): string {
-	return apiBaseUrl + path;
+	const rawUrl = apiBaseUrl ? `${apiBaseUrl}/${path.replace(/^\//, '')}` : path;
+	return rawUrl.replace(/([^:]\/)\/+/g, '$1');
 }
 
 export function authHeaders(): Record<string, string> {
