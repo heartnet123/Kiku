@@ -145,12 +145,24 @@
 		<button class="team-switcher" type="button" onclick={toggleDropdown} aria-label="Switch team">
 			<span class="team-icon"><Icon name="users" size={20} /></span>
 			<span class="team-copy">
-				<strong>{$workspaceStore.currentWorkspace?.name ?? 'Sign In Required'}</strong>
-				<small
-					>{$authStore.user
-						? `${$authStore.user.full_name} (${$workspaceStore.currentWorkspace?.role?.toUpperCase() || 'GUEST'})`
-						: 'Click to sign in'}</small
-				>
+				<strong>
+					{#if $authStore.isRehydrating}
+						Loading...
+					{:else if $authStore.isAuthenticated}
+						{$workspaceStore.currentWorkspace?.name ?? 'Default Workspace'}
+					{:else}
+						Sign In Required
+					{/if}
+				</strong>
+				<small>
+					{#if $authStore.isAuthenticated && $authStore.user}
+						{$authStore.user.full_name} ({$workspaceStore.currentWorkspace?.role?.toUpperCase() || 'MEMBER'})
+					{:else if $authStore.isRehydrating}
+						Checking session...
+					{:else}
+						Click to sign in
+					{/if}
+				</small>
 			</span>
 			<Icon name="chevron-down" size={16} className="team-chevron" />
 		</button>

@@ -7,11 +7,10 @@
 
 	let { children, data } = $props();
 
-	// Pre-hydrate store from SSR auth state (no network call needed for isAuthenticated).
-	// Workspaces are still fetched client-side via rehydrateAuth below.
+	// Pre-hydrate store from SSR auth state and workspaces.
 	$effect(() => {
 		if (data.authState) {
-			initFromServer(data.authState, []);
+			initFromServer(data.authState, data.workspaces ?? []);
 		}
 	});
 

@@ -12,7 +12,7 @@
 		{@render children()}
 	</main>
 
-	{#if !$authStore.isAuthenticated}
+	{#if !$authStore.isAuthenticated && !$authStore.isRehydrating}
 		<LoginModal />
 	{/if}
 </div>

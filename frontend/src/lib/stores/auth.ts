@@ -118,13 +118,15 @@ export function _scheduleTokenRefresh() {
 	const exp = state.tokenExpiresAt ?? _decodeJwtExp(state.token);
 	if (!exp) return;
 
+	const maxTimerMs = 2_147_483_647;
 	const delay = exp - Date.now() - 120_000;
 	if (delay <= 0) {
 		void _doRefresh();
 	} else {
+		const safeDelay = Math.min(delay, maxTimerMs);
 		refreshTimeout = setTimeout(() => {
 			void _doRefresh();
-		}, delay);
+		}, safeDelay);
 	}
 }
 

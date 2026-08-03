@@ -6,7 +6,7 @@
 	import SourcesList from '$lib/features/sources/SourcesList.svelte';
 	import SourceUploadModal from '$lib/features/sources/SourceUploadModal.svelte';
 
-	let workspaceId = $state('ws_acme');
+	let workspaceId = $derived($workspaceStore.currentWorkspace?.id ?? '');
 	let sources = $state<SourceItem[]>([]);
 	let metrics = $state<IngestionMetrics | null>(null);
 	let isLoading = $state(true);
@@ -14,19 +14,26 @@
 	let isUploadModalOpen = $state(false);
 
 	$effect(() => {
-		if ($workspaceStore.currentWorkspace) {
-			workspaceId = $workspaceStore.currentWorkspace.id;
-			loadData();
+		if (workspaceId) {
+			loadData(workspaceId);
 		}
 	});
 
-	async function loadData() {
+	async function loadData(targetWorkspaceId?: string) {
+		const activeId = targetWorkspaceId || workspaceId;
+		if (!activeId) {
+			isLoading = false;
+			sources = [];
+			metrics = null;
+			return;
+		}
+
 		isLoading = true;
 		errorMessage = null;
 		try {
 			const [sourcesRes, metricsRes] = await Promise.all([
-				fetchWorkspaceSources(workspaceId).catch(() => []),
-				fetchSourceMetrics(workspaceId).catch(() => null)
+				fetchWorkspaceSources(activeId).catch(() => []),
+				fetchSourceMetrics(activeId).catch(() => null)
 			]);
 			sources = sourcesRes;
 			metrics = metricsRes;
@@ -36,13 +43,6 @@
 			isLoading = false;
 		}
 	}
-
-	onMount(() => {
-		if ($workspaceStore.currentWorkspace) {
-			workspaceId = $workspaceStore.currentWorkspace.id;
-		}
-		loadData();
-	});
 </script>
 
 <div class="min-h-screen bg-slate-950 p-6 text-slate-100 md:p-10">

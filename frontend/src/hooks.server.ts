@@ -26,6 +26,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	if (!token) {
 		event.locals.authState = null;
+		event.locals.workspaces = null;
 		return resolve(event);
 	}
 
@@ -36,6 +37,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 		if (!response.ok) {
 			event.locals.authState = null;
+			event.locals.workspaces = null;
 			return resolve(event);
 		}
 
@@ -56,8 +58,10 @@ export const handle: Handle = async ({ event, resolve }) => {
 		};
 
 		event.locals.authState = authState;
+		event.locals.workspaces = data.workspaces ?? [];
 	} catch {
 		event.locals.authState = null;
+		event.locals.workspaces = null;
 	}
 
 	return resolve(event);
