@@ -60,17 +60,17 @@
 </script>
 
 <div
-	class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+	class="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4 backdrop-blur-sm"
 	role="dialog"
 	aria-modal="true"
 	aria-labelledby="auth-title"
 >
 	<div
-		class="relative w-full max-w-md rounded-xl border border-slate-800 bg-slate-900 p-6 text-slate-100 shadow-2xl"
+		class="relative w-full max-w-md rounded-xl border border-border bg-surface p-6 text-text shadow-2xl"
 	>
 		<button
 			type="button"
-			class="absolute right-4 top-4 rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white"
+			class="absolute right-4 top-4 rounded-lg p-1 text-muted hover:bg-surface-raised hover:text-heading"
 			onclick={closeLoginModal}
 			aria-label="Close auth dialog"
 		>
@@ -78,26 +78,26 @@
 		</button>
 		<div class="mb-5 flex items-center gap-3">
 			<div
-				class="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-600 text-lg font-bold text-white"
+				class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-lg font-bold text-primary-fg"
 			>
 				K
 			</div>
 			<div>
-				<h2 id="auth-title" class="text-xl font-bold">Kiku Workspace Identity</h2>
-				<p class="text-xs text-slate-400">Sign in or create your workspace account</p>
+				<h2 id="auth-title" class="text-xl font-bold text-heading">Kiku Workspace Identity</h2>
+				<p class="text-xs text-muted">Sign in or create your workspace account</p>
 			</div>
 		</div>
 
 		<div
-			class="mb-5 grid grid-cols-2 rounded-lg bg-slate-800 p-1"
+			class="mb-5 grid grid-cols-2 rounded-lg bg-surface-raised p-1 border border-border"
 			role="tablist"
 			aria-label="Authentication mode"
 		>
 			<button
 				type="button"
 				class={mode === 'login'
-					? 'rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white'
-					: 'rounded-md px-3 py-2 text-sm font-semibold text-slate-300'}
+					? 'rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-fg'
+					: 'rounded-md px-3 py-2 text-sm font-semibold text-muted hover:text-heading'}
 				onclick={() => (mode = 'login')}
 			>
 				Sign in
@@ -105,8 +105,8 @@
 			<button
 				type="button"
 				class={mode === 'register'
-					? 'rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white'
-					: 'rounded-md px-3 py-2 text-sm font-semibold text-slate-300'}
+					? 'rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-fg'
+					: 'rounded-md px-3 py-2 text-sm font-semibold text-muted hover:text-heading'}
 				onclick={() => (mode = 'register')}
 			>
 				Register
@@ -115,7 +115,7 @@
 
 		{#if errorMessage}
 			<div
-				class="mb-4 rounded-lg border border-red-800 bg-red-950/80 p-3 text-xs text-red-300"
+				class="mb-4 rounded-lg border border-destructive-border bg-destructive-soft p-3 text-xs text-destructive-fg"
 				role="alert"
 			>
 				{errorMessage}
@@ -123,7 +123,7 @@
 		{/if}
 		{#if infoMessage}
 			<div
-				class="mb-4 rounded-lg border border-emerald-800 bg-emerald-950/60 p-3 text-xs text-emerald-300"
+				class="mb-4 rounded-lg border border-success-border bg-success-soft p-3 text-xs text-success-fg"
 			>
 				{infoMessage}
 			</div>
@@ -132,7 +132,7 @@
 		<form onsubmit={handleSubmit} class="space-y-4">
 			{#if mode === 'register'}
 				<div>
-					<label for="full-name" class="mb-1 block text-xs font-medium text-slate-300"
+					<label for="full-name" class="mb-1 block text-xs font-medium text-text"
 						>Full name</label
 					>
 					<input
@@ -141,23 +141,23 @@
 						bind:value={fullName}
 						required
 						autocomplete="name"
-						class="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 focus:border-indigo-500 focus:outline-none"
+						class="w-full rounded-lg border border-border-strong bg-surface-raised px-3 py-2 text-sm text-text focus:border-primary focus:outline-none"
 					/>
 				</div>
 			{/if}
 			<div>
-				<label for="email" class="mb-1 block text-xs font-medium text-slate-300">Email</label>
+				<label for="email" class="mb-1 block text-xs font-medium text-text">Email</label>
 				<input
 					id="email"
 					type="email"
 					bind:value={email}
 					required
 					autocomplete="email"
-					class="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 focus:border-indigo-500 focus:outline-none"
+					class="w-full rounded-lg border border-border-strong bg-surface-raised px-3 py-2 text-sm text-text focus:border-primary focus:outline-none"
 				/>
 			</div>
 			<div>
-				<label for="password" class="mb-1 block text-xs font-medium text-slate-300">Password</label>
+				<label for="password" class="mb-1 block text-xs font-medium text-text">Password</label>
 				<input
 					id="password"
 					type="password"
@@ -165,13 +165,13 @@
 					required
 					minlength={mode === 'register' ? 8 : undefined}
 					autocomplete={mode === 'register' ? 'new-password' : 'current-password'}
-					class="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 focus:border-indigo-500 focus:outline-none"
+					class="w-full rounded-lg border border-border-strong bg-surface-raised px-3 py-2 text-sm text-text focus:border-primary focus:outline-none"
 				/>
 			</div>
 			<button
 				type="submit"
 				disabled={isLoading}
-				class="w-full rounded-lg bg-indigo-600 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:opacity-50"
+				class="w-full rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-fg transition hover:bg-primary-hover disabled:opacity-50"
 			>
 				{isLoading ? 'Please wait...' : mode === 'login' ? 'Sign in' : 'Create account'}
 			</button>

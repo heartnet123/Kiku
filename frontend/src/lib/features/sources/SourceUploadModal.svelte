@@ -62,15 +62,15 @@
 
 {#if isOpen}
 	<div
-		class="animate-fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+		class="animate-fade-in fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4 backdrop-blur-sm"
 	>
 		<div
-			class="w-full max-w-lg rounded-2xl border border-white/10 bg-slate-900 p-6 text-slate-100 shadow-2xl"
+			class="w-full max-w-lg rounded-2xl border border-border bg-surface p-6 text-text shadow-2xl"
 		>
-			<div class="flex items-center justify-between border-b border-white/10 pb-4">
-				<h3 class="flex items-center gap-2 text-xl font-bold tracking-tight text-white">
+			<div class="flex items-center justify-between border-b border-border pb-4">
+				<h3 class="flex items-center gap-2 text-xl font-bold tracking-tight text-heading">
 					<svg
-						class="h-6 w-6 text-indigo-400"
+						class="h-6 w-6 text-accent"
 						fill="none"
 						viewBox="0 0 24 24"
 						stroke="currentColor"
@@ -86,7 +86,7 @@
 				</h3>
 				<button
 					onclick={onClose}
-					class="rounded-lg p-1 text-slate-400 transition hover:bg-white/10 hover:text-white"
+					class="rounded-lg p-1 text-muted transition hover:bg-surface-raised hover:text-heading"
 					aria-label="Close dialog"
 				>
 					<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -101,15 +101,17 @@
 			</div>
 
 			<div class="mt-4 space-y-4">
-				<p class="text-sm text-slate-400">
-					Upload a Markdown (<code class="text-indigo-300">.md</code>), plain text (<code
-						class="text-indigo-300">.txt</code
-					>), or PDF (<code class="text-indigo-300">.pdf</code>) document. LlamaIndex will index its
+				<p class="text-sm text-subtle">
+					Upload a Markdown (<code class="text-accent font-semibold">.md</code>), plain text (<code
+						class="text-accent font-semibold">.txt</code
+					>), or PDF (<code class="text-accent font-semibold">.pdf</code>) document. LlamaIndex will index its
 					content into your workspace vector store.
 				</p>
 
 				<!-- Dropzone -->
 				<div
+					role="region"
+					aria-label="File upload dropzone"
 					ondragover={(e) => {
 						e.preventDefault();
 						isDragOver = true;
@@ -118,8 +120,8 @@
 					ondrop={handleDrop}
 					class={`relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-8 text-center transition ${
 						isDragOver
-							? 'border-indigo-400 bg-indigo-500/10'
-							: 'border-white/20 bg-slate-800/50 hover:border-indigo-500/50 hover:bg-slate-800'
+							? 'border-accent bg-accent-soft'
+							: 'border-border bg-surface-raised hover:border-accent hover:bg-surface-soft'
 					}`}
 				>
 					<input
@@ -129,7 +131,7 @@
 						class="absolute inset-0 cursor-pointer opacity-0"
 					/>
 					<svg
-						class="mb-3 h-10 w-10 text-indigo-400"
+						class="mb-3 h-10 w-10 text-accent"
 						fill="none"
 						viewBox="0 0 24 24"
 						stroke="currentColor"
@@ -142,25 +144,25 @@
 						/>
 					</svg>
 					{#if selectedFile}
-						<span class="font-semibold text-indigo-300">{selectedFile.name}</span>
-						<span class="mt-1 text-xs text-slate-400"
+						<span class="font-semibold text-accent">{selectedFile.name}</span>
+						<span class="mt-1 text-xs text-muted"
 							>{(selectedFile.size / 1024).toFixed(1)} KB</span
 						>
 					{:else}
-						<span class="text-sm font-medium text-slate-200"
-							>Drag and drop your file here, or <span class="text-indigo-400 underline">browse</span
+						<span class="text-sm font-medium text-heading"
+							>Drag and drop your file here, or <span class="text-accent underline">browse</span
 							></span
 						>
-						<span class="mt-1 text-xs text-slate-500">Supports Markdown, Text, and PDF files</span>
+						<span class="mt-1 text-xs text-muted">Supports Markdown, Text, and PDF files</span>
 					{/if}
 				</div>
 
 				{#if errorMessage}
 					<div
-						class="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-300"
+						class="flex items-start gap-2 rounded-lg border border-destructive-border bg-destructive-soft p-3 text-xs text-destructive-fg"
 					>
 						<svg
-							class="mt-0.5 h-4 w-4 shrink-0 text-red-400"
+							class="mt-0.5 h-4 w-4 shrink-0 text-destructive"
 							fill="none"
 							viewBox="0 0 24 24"
 							stroke="currentColor"
@@ -177,12 +179,12 @@
 				{/if}
 			</div>
 
-			<div class="mt-6 flex justify-end gap-3 border-t border-white/10 pt-4">
+			<div class="mt-6 flex justify-end gap-3 border-t border-border pt-4">
 				<button
 					type="button"
 					onclick={onClose}
 					disabled={isUploading}
-					class="rounded-lg px-4 py-2 text-sm font-medium text-slate-400 transition hover:text-white disabled:opacity-50"
+					class="rounded-lg px-4 py-2 text-sm font-medium text-muted transition hover:text-heading disabled:opacity-50"
 				>
 					Cancel
 				</button>
@@ -190,10 +192,10 @@
 					type="button"
 					onclick={handleSubmit}
 					disabled={!selectedFile || isUploading}
-					class="flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition hover:bg-indigo-500 disabled:opacity-50 disabled:shadow-none"
+					class="flex items-center gap-2 rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-primary-fg shadow-lg transition hover:bg-primary-hover disabled:opacity-50"
 				>
 					{#if isUploading}
-						<svg class="h-4 w-4 animate-spin text-white" fill="none" viewBox="0 0 24 24">
+						<svg class="h-4 w-4 animate-spin text-primary-fg" fill="none" viewBox="0 0 24 24">
 							<circle
 								class="opacity-25"
 								cx="12"
