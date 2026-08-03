@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 
 import httpx
 try:
@@ -51,8 +51,22 @@ def _sync_public_user(user: User, token: str | None = None) -> None:
         pass
 
 
+def _set_auth_cookies(response: Response, token: str | None, refresh_token: str | None, max_age: int = 3600) -> None:
+    """Attach HttpOnly session cookies. Set secure=True behind a TLS proxy in production."""
+    kwargs: dict = dict(httponly=True, samesite="lax", secure=False)
+    if token:
+        response.set_cookie("kiku_access_token", token, max_age=max_age, **kwargs)
+    if refresh_token:
+        response.set_cookie("kiku_refresh_token", refresh_token, max_age=max_age * 4, **kwargs)
+
+
+def _clear_auth_cookies(response: Response) -> None:
+    response.delete_cookie("kiku_access_token", httponly=True, samesite="lax")
+    response.delete_cookie("kiku_refresh_token", httponly=True, samesite="lax")
+
+
 @router.post("/register", response_model=LoginResponse, status_code=status.HTTP_201_CREATED)
-async def register(request: RegisterRequest) -> LoginResponse:
+async def register(request: RegisterRequest, response: Response) -> LoginResponse:
     client = create_supabase_client()
     if not client:
         raise HTTPException(
@@ -61,7 +75,7 @@ async def register(request: RegisterRequest) -> LoginResponse:
         )
 
     try:
-        response = client.auth.sign_up(
+        response_auth = client.auth.sign_up(
             {
                 "email": str(request.email),
                 "password": request.password,
@@ -74,18 +88,20 @@ async def register(request: RegisterRequest) -> LoginResponse:
             detail="Registration failed. The email may already be registered or invalid.",
         ) from exc
 
-    auth_user = getattr(response, "user", None)
+    auth_user = getattr(response_auth, "user", None)
     if not auth_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Registration did not create a user.",
         )
 
-    session = getattr(response, "session", None)
+    session = getattr(response_auth, "session", None)
     token, refresh_token = _session_values(session)
     user = _user_from_auth_user(auth_user, request.full_name.strip())
     _sync_public_user(user, token)
     workspaces = _build_user_workspaces(user.id, create_supabase_client(token) if token else None)
+    if token:
+        _set_auth_cookies(response, token, refresh_token)
     return _login_response(
         token,
         refresh_token,
@@ -96,7 +112,7 @@ async def register(request: RegisterRequest) -> LoginResponse:
 
 
 @router.post("/login", response_model=LoginResponse)
-async def login(request: LoginRequest) -> LoginResponse:
+async def login(request: LoginRequest, response: Response) -> LoginResponse:
     client = create_supabase_client()
 
     if not client:
@@ -106,7 +122,7 @@ async def login(request: LoginRequest) -> LoginResponse:
         )
 
     try:
-        response = client.auth.sign_in_with_password(
+        response_auth = client.auth.sign_in_with_password(
             {"email": str(request.email), "password": request.password}
         )
     except (AuthRetryableError, httpx.RequestError, httpx.HTTPError) as exc:
@@ -125,8 +141,8 @@ async def login(request: LoginRequest) -> LoginResponse:
             detail="Invalid email or password.",
         ) from exc
 
-    auth_user = getattr(response, "user", None)
-    session = getattr(response, "session", None)
+    auth_user = getattr(response_auth, "user", None)
+    session = getattr(response_auth, "session", None)
     token, refresh_token = _session_values(session)
     if not auth_user or not token:
         raise HTTPException(
@@ -138,6 +154,7 @@ async def login(request: LoginRequest) -> LoginResponse:
     _sync_public_user(user, token)
     scoped_client = create_supabase_client(token)
     workspaces = _build_user_workspaces(user.id, scoped_client)
+    _set_auth_cookies(response, token, refresh_token)
     return _login_response(token, refresh_token, user, workspaces)
 
 
@@ -156,7 +173,7 @@ async def get_me(
 
 
 @router.post("/refresh", response_model=LoginResponse)
-async def refresh_session(request: RefreshTokenRequest) -> LoginResponse:
+async def refresh_session(request: RefreshTokenRequest, response: Response) -> LoginResponse:
     client = create_supabase_client()
     if not client:
         raise HTTPException(
@@ -165,15 +182,15 @@ async def refresh_session(request: RefreshTokenRequest) -> LoginResponse:
         )
 
     try:
-        response = client.auth.refresh_session(request.refresh_token)
+        response_auth = client.auth.refresh_session(request.refresh_token)
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Refresh token is invalid or expired.",
         ) from exc
 
-    auth_user = getattr(response, "user", None)
-    session = getattr(response, "session", None)
+    auth_user = getattr(response_auth, "user", None)
+    session = getattr(response_auth, "session", None)
     token, new_refresh_token = _session_values(session)
     if not auth_user or not token:
         raise HTTPException(
@@ -183,9 +200,15 @@ async def refresh_session(request: RefreshTokenRequest) -> LoginResponse:
 
     user = _user_from_auth_user(auth_user)
     scoped_client = create_supabase_client(token)
+    _set_auth_cookies(response, token, new_refresh_token)
     return _login_response(
         token,
         new_refresh_token,
         user,
         _build_user_workspaces(user.id, scoped_client),
     )
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+async def logout_endpoint(response: Response) -> None:
+    _clear_auth_cookies(response)
