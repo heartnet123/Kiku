@@ -46,26 +46,38 @@ export function _decodeJwtExp(token: string): number | null {
 
 export interface AuthModalState {
 	isOpen: boolean;
+	mode?: 'login' | 'register';
 	pendingAction: (() => void | Promise<void>) | null;
 }
 
 const initialModalState: AuthModalState = {
 	isOpen: false,
+	mode: 'login',
 	pendingAction: null
 };
 
 export const authModalStore = writable<AuthModalState>(initialModalState);
 
-export function openLoginModal(onSuccess?: () => void | Promise<void>): void {
+// ponytail: single function handles opening modal with mode preference
+export function openLoginModal(
+	onSuccess?: () => void | Promise<void>,
+	mode: 'login' | 'register' = 'login'
+): void {
 	authModalStore.set({
 		isOpen: true,
+		mode,
 		pendingAction: onSuccess ?? null
 	});
+}
+
+export function openRegisterModal(onSuccess?: () => void | Promise<void>): void {
+	openLoginModal(onSuccess, 'register');
 }
 
 export function closeLoginModal(): void {
 	authModalStore.set({
 		isOpen: false,
+		mode: 'login',
 		pendingAction: null
 	});
 }

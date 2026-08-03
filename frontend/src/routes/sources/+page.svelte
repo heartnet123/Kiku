@@ -1,28 +1,36 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { workspaceStore } from '$lib/stores/workspace';
-	import { requireAuth } from '$lib/stores/auth';
+	import { authStore, openLoginModal, openRegisterModal, requireAuth } from '$lib/stores/auth';
 	import { fetchSourceMetrics, fetchWorkspaceSources } from '$lib/features/sources/api';
 	import type { IngestionMetrics, SourceItem } from '$lib/features/sources/types';
 	import SourcesList from '$lib/features/sources/SourcesList.svelte';
 	import SourceUploadModal from '$lib/features/sources/SourceUploadModal.svelte';
 
+	// ponytail: reactive central auth state
+	let isAuthenticated = $derived($authStore.isAuthenticated);
+	let isRehydrating = $derived($authStore.isRehydrating);
 	let workspaceId = $derived($workspaceStore.currentWorkspace?.id ?? '');
 	let sources = $state<SourceItem[]>([]);
 	let metrics = $state<IngestionMetrics | null>(null);
-	let isLoading = $state(true);
+	let isLoading = $state(false);
 	let errorMessage = $state<string | null>(null);
 	let isUploadModalOpen = $state(false);
 
 	$effect(() => {
-		if (workspaceId) {
+		if (!isRehydrating && isAuthenticated && workspaceId) {
 			loadData(workspaceId);
+		} else if (!isRehydrating && !isAuthenticated) {
+			isLoading = false;
+			sources = [];
+			metrics = null;
+		} else if (!isRehydrating && isAuthenticated && !workspaceId) {
+			isLoading = false;
 		}
 	});
 
 	async function loadData(targetWorkspaceId?: string) {
 		const activeId = targetWorkspaceId || workspaceId;
-		if (!activeId) {
+		if (!activeId || !isAuthenticated) {
 			isLoading = false;
 			sources = [];
 			metrics = null;
@@ -83,7 +91,7 @@
 
 			<div class="flex items-center gap-3">
 				<button
-					onclick={() => loadData()}
+					onclick={() => (isAuthenticated ? loadData() : openLoginModal())}
 					disabled={isLoading}
 					class="flex items-center gap-2 rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-text transition hover:bg-surface-raised hover:text-heading disabled:opacity-50"
 				>
@@ -125,7 +133,7 @@
 			</div>
 		{/if}
 
-		{#if isLoading && sources.length === 0}
+		{#if isRehydrating || (isLoading && isAuthenticated && sources.length === 0)}
 			<div class="flex items-center justify-center py-20">
 				<div class="flex flex-col items-center gap-3 text-muted">
 					<svg class="h-8 w-8 animate-spin text-accent" fill="none" viewBox="0 0 24 24">
@@ -138,6 +146,40 @@
 						></path>
 					</svg>
 					<span class="text-sm font-medium">Loading workspace sources...</span>
+				</div>
+			</div>
+		{:else if !isAuthenticated}
+			<!-- ponytail: guest auth required state with login & register buttons -->
+			<div
+				class="flex flex-col items-center justify-center rounded-2xl border border-border bg-surface p-12 text-center shadow-sm"
+			>
+				<div
+					class="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-accent-soft text-accent"
+				>
+					<svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+						/>
+					</svg>
+				</div>
+				<h3 class="text-xl font-bold text-heading">Authentication Required</h3>
+				<p class="mt-2 max-w-md text-sm text-muted">Please log in to view workspace sources.</p>
+				<div class="mt-6 flex items-center justify-center gap-3">
+					<button
+						onclick={() => openLoginModal()}
+						class="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-fg shadow-md transition hover:bg-primary-hover"
+					>
+						Log in
+					</button>
+					<button
+						onclick={() => openRegisterModal()}
+						class="rounded-xl border border-border bg-surface-raised px-5 py-2.5 text-sm font-semibold text-text transition hover:bg-surface-raised/80 hover:text-heading"
+					>
+						Register
+					</button>
 				</div>
 			</div>
 		{:else}

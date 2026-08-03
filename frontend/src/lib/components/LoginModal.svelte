@@ -1,9 +1,15 @@
 <script lang="ts">
 	import { apiRequest } from '../api/client';
-	import { closeLoginModal, rehydrateAuth, setAuthSession } from '../stores/auth';
+	import { authModalStore, closeLoginModal, rehydrateAuth, setAuthSession } from '../stores/auth';
 	import type { WorkspaceItem, UserProfile } from '../stores/workspace';
 
-	let mode = $state<'login' | 'register'>('login');
+	// ponytail: sync mode with authModalStore state
+	let mode = $state<'login' | 'register'>($authModalStore.mode ?? 'login');
+	$effect(() => {
+		if ($authModalStore.isOpen && $authModalStore.mode) {
+			mode = $authModalStore.mode;
+		}
+	});
 	let email = $state(import.meta.env.DEV ? 'admin@acme.com' : '');
 	let password = $state(import.meta.env.DEV ? 'admin123' : '');
 	let fullName = $state('');

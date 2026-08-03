@@ -5,6 +5,7 @@ import {
 	authModalStore,
 	requireAuth,
 	openLoginModal,
+	openRegisterModal,
 	closeLoginModal,
 	setAuthSession,
 	logout
@@ -81,11 +82,20 @@ describe('YAGNI Auth Guard & Modal Intercept Flow', () => {
 		openLoginModal(pendingFn);
 
 		expect(get(authModalStore).isOpen).toBe(true);
+		expect(get(authModalStore).mode).toBe('login');
 
 		closeLoginModal();
 
 		expect(get(authModalStore).isOpen).toBe(false);
 		expect(get(authModalStore).pendingAction).toBeNull();
 		expect(pendingFn).not.toHaveBeenCalled();
+	});
+
+	it('7. openRegisterModal opens AuthModal in register mode', () => {
+		openRegisterModal();
+
+		const modal = get(authModalStore);
+		expect(modal.isOpen).toBe(true);
+		expect(modal.mode).toBe('register');
 	});
 });
