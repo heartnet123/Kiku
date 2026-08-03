@@ -45,4 +45,15 @@ describe('workspaceStore', () => {
 
 		expect(getCurrentWorkspaceId()).toBe('ws-2');
 	});
+
+	it('keeps the active workspace when setWorkspaces still lists it', () => {
+		const ws1: WorkspaceItem = { id: 'ws-1', name: 'WS 1', slug: 'ws-1', role: 'owner' };
+		const ws2: WorkspaceItem = { id: 'ws-2', name: 'WS 2', slug: 'ws-2', role: 'member' };
+		setWorkspaces([ws1, ws2]);
+		switchWorkspace('ws-2');
+
+		setWorkspaces([ws2, ws1]);
+
+		expect(getCurrentWorkspaceId()).toBe('ws-2');
+	});
 });

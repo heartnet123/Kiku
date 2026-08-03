@@ -10,7 +10,7 @@ import {
 	getCurrentUser,
 	initFromServer
 } from './auth';
-import { workspaceStore, setWorkspaces, clearWorkspaces } from './workspace';
+import { workspaceStore, setWorkspaces, switchWorkspace, clearWorkspaces } from './workspace';
 
 describe('Frontend Auth State Sync & Session Lifecycle Flow', () => {
 	const user = { id: 'usr-100', email: 'alice@example.com', full_name: 'Alice Cooper' };
@@ -25,6 +25,7 @@ describe('Frontend Auth State Sync & Session Lifecycle Flow', () => {
 	afterEach(() => {
 		vi.restoreAllMocks();
 		logout();
+		vi.unstubAllGlobals();
 	});
 
 	// 1. Guest state
@@ -44,7 +45,7 @@ describe('Frontend Auth State Sync & Session Lifecycle Flow', () => {
 
 	// 2. Authenticated state
 	it('2. correctly represents Authenticated state with synchronized user and workspace', () => {
-		setAuthSession(dummyJwt, user, [workspace], 'refresh-tok-1');
+		setAuthSession(dummyJwt, user, [workspace]);
 
 		const state = get(authStore);
 		const wsState = get(workspaceStore);
@@ -53,7 +54,8 @@ describe('Frontend Auth State Sync & Session Lifecycle Flow', () => {
 		expect(state.isRehydrating).toBe(false);
 		expect(state.user).toEqual(user);
 		expect(state.token).toBe(dummyJwt);
-		expect(state.refreshToken).toBe('refresh-tok-1');
+		// The refresh token stays in the HttpOnly cookie, never in this store.
+		expect('refreshToken' in state).toBe(false);
 
 		expect(wsState.workspaces).toEqual([workspace]);
 		expect(wsState.currentWorkspace).toEqual(workspace);
@@ -64,7 +66,6 @@ describe('Frontend Auth State Sync & Session Lifecycle Flow', () => {
 		// Initial state has isRehydrating: true
 		authStore.set({
 			token: null,
-			refreshToken: null,
 			user: null,
 			isAuthenticated: false,
 			isRehydrating: true,
@@ -77,7 +78,6 @@ describe('Frontend Auth State Sync & Session Lifecycle Flow', () => {
 		initFromServer(
 			{
 				token: dummyJwt,
-				refreshToken: 'refresh-ssr',
 				user,
 				isAuthenticated: true,
 				isRehydrating: false,
@@ -100,7 +100,7 @@ describe('Frontend Auth State Sync & Session Lifecycle Flow', () => {
 		expect(get(authStore).isAuthenticated).toBe(false);
 
 		// Execute login session update
-		setAuthSession(dummyJwt, user, [workspace], 'refresh-2');
+		setAuthSession(dummyJwt, user, [workspace]);
 
 		// Instant state assertion
 		expect(get(authStore).isAuthenticated).toBe(true);
@@ -159,8 +159,12 @@ describe('Frontend Auth State Sync & Session Lifecycle Flow', () => {
 		expect(get(workspaceStore).currentWorkspace).toEqual(ws1);
 
 		// Switching workspace updates currentWorkspace synchronously
-		setWorkspaces([ws1, ws2]);
-		expect(get(workspaceStore).currentWorkspace?.id).toBe('ws-1');
+		switchWorkspace('ws-2');
+		expect(get(workspaceStore).currentWorkspace?.id).toBe('ws-2');
+
+		// A refreshed list keeps the active selection rather than resetting to the first
+		setWorkspaces([ws2, ws1]);
+		expect(get(workspaceStore).currentWorkspace?.id).toBe('ws-2');
 
 		// If setWorkspaces is called with empty array for authenticated user
 		setWorkspaces([]);

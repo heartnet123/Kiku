@@ -1,12 +1,16 @@
 import { writable, get } from 'svelte/store';
-import { apiRequest } from '../api/client';
+import { apiRequest, apiUrl } from '../api/client';
+import { decodeJwtExp } from '../utils/jwt';
 import { setWorkspaces, clearWorkspaces, type WorkspaceItem, type UserProfile } from './workspace';
 
 export type { UserProfile };
 
+/**
+ * Client-visible session. The refresh token deliberately lives only in the
+ * HttpOnly `kiku_refresh_token` cookie, so it never reaches this store.
+ */
 export interface AuthState {
 	token: string | null;
-	refreshToken: string | null;
 	user: UserProfile | null;
 	isAuthenticated: boolean;
 	isRehydrating: boolean;
@@ -15,7 +19,6 @@ export interface AuthState {
 
 const initialAuth: AuthState = {
 	token: null,
-	refreshToken: null,
 	user: null,
 	isAuthenticated: false,
 	isRehydrating: true,
@@ -26,23 +29,7 @@ export const authStore = writable<AuthState>(initialAuth);
 
 let refreshTimeout: ReturnType<typeof setTimeout> | null = null;
 
-export function _decodeJwtExp(token: string): number | null {
-	try {
-		const parts = token.split('.');
-		if (parts.length < 2) return null;
-		const payloadBase64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-		const jsonPayload = decodeURIComponent(
-			atob(payloadBase64)
-				.split('')
-				.map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-				.join('')
-		);
-		const payload = JSON.parse(jsonPayload);
-		return typeof payload.exp === 'number' ? payload.exp * 1000 : null;
-	} catch {
-		return null;
-	}
-}
+export const _decodeJwtExp = decodeJwtExp;
 
 export interface AuthModalState {
 	isOpen: boolean;
@@ -58,7 +45,7 @@ const initialModalState: AuthModalState = {
 
 export const authModalStore = writable<AuthModalState>(initialModalState);
 
-// ponytail: single function handles opening modal with mode preference
+// Single function handles opening the modal with a mode preference.
 export function openLoginModal(
 	onSuccess?: () => void | Promise<void>,
 	mode: 'login' | 'register' = 'login'
@@ -82,40 +69,40 @@ export function closeLoginModal(): void {
 	});
 }
 
+/**
+ * Fire-and-forget a caller action without leaking an unhandled rejection.
+ * `action()` runs synchronously; only its async tail gets the catch.
+ */
+function _runDetached(action: () => void | Promise<void>): void {
+	void Promise.resolve(action()).catch(() => {});
+}
+
 export function requireAuth(action: () => void | Promise<void>): boolean {
 	const state = get(authStore);
 	if (state.isAuthenticated) {
-		void action();
+		_runDetached(action);
 		return true;
 	}
 	openLoginModal(action);
 	return false;
 }
 
-export function setAuthSession(
-	token: string,
-	user: UserProfile,
-	workspaces: WorkspaceItem[],
-	refreshToken: string | null = null
-) {
-	const expiresAt = _decodeJwtExp(token);
+export function setAuthSession(token: string, user: UserProfile, workspaces: WorkspaceItem[]) {
 	authStore.set({
 		token,
-		refreshToken,
 		user,
 		isAuthenticated: true,
 		isRehydrating: false,
-		tokenExpiresAt: expiresAt
+		tokenExpiresAt: decodeJwtExp(token)
 	});
 
 	setWorkspaces(workspaces);
 	_scheduleTokenRefresh();
 
-	const modalState = get(authModalStore);
-	const pending = modalState.pendingAction;
+	const pending = get(authModalStore).pendingAction;
 	closeLoginModal();
 	if (pending) {
-		void pending();
+		_runDetached(pending);
 	}
 }
 
@@ -128,34 +115,27 @@ export function logout(): void {
 	authStore.set({ ...initialAuth, isRehydrating: false });
 	clearWorkspaces();
 	if (typeof window !== 'undefined') {
-		void fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'include' });
+		// Must hit the API origin so the backend can revoke and expire its cookies.
+		void fetch(apiUrl('/api/v1/auth/logout'), {
+			method: 'POST',
+			credentials: 'include'
+		}).catch(() => {});
 	}
 }
 
 async function _doRefresh() {
-	const state = get(authStore);
-	if (!state.refreshToken) {
-		logout();
-		return;
-	}
-
 	try {
+		// The refresh token travels as an HttpOnly cookie; apiRequest sends credentials.
 		const response = await apiRequest<{
 			token: string;
-			refresh_token?: string | null;
 			user: UserProfile;
 			workspaces: WorkspaceItem[];
 		}>('/api/v1/auth/refresh', {
 			method: 'POST',
-			body: JSON.stringify({ refresh_token: state.refreshToken })
+			body: JSON.stringify({})
 		});
 
-		setAuthSession(
-			response.token,
-			response.user,
-			response.workspaces,
-			response.refresh_token ?? state.refreshToken
-		);
+		setAuthSession(response.token, response.user, response.workspaces);
 	} catch {
 		logout();
 	}
@@ -167,10 +147,12 @@ export function _scheduleTokenRefresh() {
 		refreshTimeout = null;
 	}
 
+	// Cookie-restored sessions have no client-side refresh token, so gate on the
+	// session itself and let the HttpOnly cookie authorize the refresh call.
 	const state = get(authStore);
-	if (!state.refreshToken || !state.isAuthenticated || !state.token) return;
+	if (!state.isAuthenticated || !state.token) return;
 
-	const exp = state.tokenExpiresAt ?? _decodeJwtExp(state.token);
+	const exp = state.tokenExpiresAt ?? decodeJwtExp(state.token);
 	if (!exp) return;
 
 	const maxTimerMs = 2_147_483_647;
@@ -198,7 +180,7 @@ export async function rehydrateAuth(): Promise<void> {
 			workspaces: WorkspaceItem[];
 		}>('/api/v1/auth/me');
 
-		setAuthSession(response.token, response.user, response.workspaces, null);
+		setAuthSession(response.token, response.user, response.workspaces);
 	} catch {
 		authStore.update((state) => ({ ...state, isRehydrating: false }));
 		clearWorkspaces();

@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { get } from 'svelte/store';
+
+// client.ts reads the base URL once at import, so the env has to be mocked
+// (hoisted) rather than stubbed inside a test.
+vi.mock('$env/dynamic/public', () => ({ env: { PUBLIC_API_BASE_URL: 'http://api.test:8000' } }));
+
 import {
 	authStore,
 	setAuthSession,
@@ -33,12 +38,11 @@ describe('authStore and auto-refresh', () => {
 	});
 
 	it('sets auth session and populates workspace store', () => {
-		setAuthSession(dummyJwt, user, [workspace], 'refresh-123');
+		setAuthSession(dummyJwt, user, [workspace]);
 
 		const state = get(authStore);
 		expect(state.isAuthenticated).toBe(true);
 		expect(state.token).toBe(dummyJwt);
-		expect(state.refreshToken).toBe('refresh-123');
 		expect(state.user).toEqual(user);
 		expect(state.tokenExpiresAt).toBe(1800000000 * 1000);
 
@@ -51,7 +55,7 @@ describe('authStore and auto-refresh', () => {
 	});
 
 	it('clears session and workspace state on logout', () => {
-		setAuthSession(dummyJwt, user, [workspace], 'refresh-123');
+		setAuthSession(dummyJwt, user, [workspace]);
 		logout();
 
 		const state = get(authStore);
@@ -65,6 +69,8 @@ describe('authStore and auto-refresh', () => {
 		expect(wsState.currentWorkspace).toBeNull();
 	});
 
+	// A cookie-restored session has no client-readable refresh token; the refresh
+	// must still fire and rely on the HttpOnly cookie via credentials: 'include'.
 	it('triggers refresh immediately if delay is less than or equal to 0', async () => {
 		// JWT with exp in past: exp = 1000 (Jan 1 1970)
 		// Payload base64 for '{"exp":1000}' is 'eyJleHAiOjEwMDB9'
@@ -74,7 +80,6 @@ describe('authStore and auto-refresh', () => {
 			new Response(
 				JSON.stringify({
 					token: 'new-token',
-					refresh_token: 'new-refresh',
 					user,
 					workspaces: [workspace]
 				}),
@@ -85,7 +90,6 @@ describe('authStore and auto-refresh', () => {
 
 		authStore.set({
 			token: expiredJwt,
-			refreshToken: 'refresh-old',
 			user,
 			isAuthenticated: true,
 			isRehydrating: false,
@@ -99,37 +103,42 @@ describe('authStore and auto-refresh', () => {
 
 		expect(fetchMock).toHaveBeenCalledWith(
 			expect.stringContaining('/api/v1/auth/refresh'),
-			expect.objectContaining({
-				method: 'POST',
-				body: JSON.stringify({ refresh_token: 'refresh-old' })
-			})
+			expect.objectContaining({ method: 'POST', credentials: 'include' })
 		);
+		// The refresh token must never travel in the request body.
+		const sentBody = fetchMock.mock.calls[0][1]?.body;
+		expect(sentBody).not.toContain('refresh_token');
 
-		const state = get(authStore);
-		expect(state.token).toBe('new-token');
-		expect(state.refreshToken).toBe('new-refresh');
+		expect(get(authStore).token).toBe('new-token');
 		vi.unstubAllGlobals();
 	});
 
-	it('setAuthSession does not write to sessionStorage', () => {
-		const mockSessionStorage = { setItem: vi.fn(), getItem: vi.fn(), removeItem: vi.fn() };
+	it('setAuthSession keeps the token out of web storage', () => {
+		// The node test env has no Storage class, so stub the globals auth.ts
+		// would reach for and assert nothing is persisted at all.
+		const setItem = vi.fn();
 		vi.stubGlobal('window', {});
-		vi.stubGlobal('sessionStorage', mockSessionStorage);
+		vi.stubGlobal('sessionStorage', { setItem, getItem: vi.fn(), removeItem: vi.fn() });
+		vi.stubGlobal('localStorage', { setItem, getItem: vi.fn(), removeItem: vi.fn() });
+
 		setAuthSession(dummyJwt, user, [workspace]);
-		expect(mockSessionStorage.setItem).not.toHaveBeenCalledWith('kiku_auth_token', expect.anything());
+
+		expect(setItem).not.toHaveBeenCalled();
 		vi.unstubAllGlobals();
 	});
 
-	it('logout fires POST /api/v1/auth/logout', async () => {
+	it('logout posts to the API origin, not the SvelteKit origin', async () => {
+		vi.stubEnv('PUBLIC_API_BASE_URL', 'http://api.test:8000');
 		const fetchSpy = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
 		vi.stubGlobal('window', {});
 		vi.stubGlobal('fetch', fetchSpy);
 		logout();
 		await new Promise((r) => setTimeout(r, 0));
 		expect(fetchSpy).toHaveBeenCalledWith(
-			expect.stringContaining('/auth/logout'),
+			'http://api.test:8000/api/v1/auth/logout',
 			expect.objectContaining({ method: 'POST', credentials: 'include' })
 		);
 		vi.unstubAllGlobals();
+		vi.unstubAllEnvs();
 	});
 });
