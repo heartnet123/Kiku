@@ -86,7 +86,7 @@
 
 <style>
 	.workspace-actions {
-		border-top: 1px solid #332d4d;
+		border-top: 1px solid var(--color-border);
 		margin: 4px 0;
 		padding: 6px 0;
 	}
@@ -105,11 +105,11 @@
 		padding: 7px 6px;
 	}
 	.workspace-action {
-		background: #2a2540;
-		color: #c4b5fd;
+		background: var(--color-surface-hover);
+		color: var(--color-accent);
 	}
 	.workspace-action:hover {
-		background: #3b2d66;
+		background: var(--color-accent-soft);
 	}
 	.workspace-form {
 		display: grid;
@@ -117,15 +117,15 @@
 		margin-top: 6px;
 	}
 	.workspace-form strong {
-		color: #e2e8f0;
+		color: var(--color-heading);
 		font-size: 11px;
 	}
 	.workspace-form input {
 		width: 100%;
-		border: 1px solid #4c4568;
+		border: 1px solid var(--color-border-strong);
 		border-radius: 6px;
-		background: #161326;
-		color: #f8fafc;
+		background: var(--color-surface);
+		color: var(--color-text);
 		font-size: 11px;
 		padding: 7px;
 	}
@@ -136,17 +136,17 @@
 	}
 	.workspace-cancel {
 		background: transparent;
-		color: #94a3b8;
+		color: var(--color-muted);
 	}
 	.workspace-submit {
-		background: #7c5bd6;
-		color: white;
+		background: var(--color-primary);
+		color: var(--color-primary-fg);
 	}
 	.workspace-submit:disabled {
 		opacity: 0.5;
 	}
 	.workspace-error {
-		color: #fca5a5;
+		color: var(--color-destructive-fg);
 		font-size: 10px;
 	}
 </style>

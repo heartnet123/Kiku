@@ -1,4 +1,4 @@
-	<script lang="ts">
+<script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import Icon, { type IconName } from '$lib/components/Icon.svelte';
@@ -6,6 +6,7 @@
 	import WorkspaceActions from './WorkspaceActions.svelte';
 	import { authStore, logout, openLoginModal, requireAuth } from '../stores/auth';
 	import { workspaceStore, switchWorkspace } from '../stores/workspace';
+	import { themeStore, toggleTheme } from '../stores/theme';
 
 	import { listSessions, deleteSession } from '$lib/features/chat/chatApi';
 	import type { ChatSession } from '$lib/features/chat/types';
@@ -59,17 +60,28 @@
 
 <aside class="sidebar" aria-label="Main navigation">
 	<div class="sidebar-top">
+		<div class="brand-row">
 			<a class="brand" href="/" aria-label="Kiku home">
-			<img class="brand-icon" src="/kiku-icon.png" alt="" aria-hidden="true" />
-			<span>Kiku</span>
-		</a>
+				<img class="brand-icon" src="/kiku-icon.png" alt="" aria-hidden="true" />
+				<span>Kiku</span>
+			</a>
+			<button
+				type="button"
+				class="theme-toggle-btn"
+				onclick={toggleTheme}
+				aria-label="Toggle light/dark theme"
+				title="Toggle light/dark theme"
+			>
+				<Icon name={$themeStore === 'dark' ? 'sun' : 'moon'} size={18} />
+			</button>
+		</div>
 		<nav class="primary-nav">
 			{#each navItems as item (item.href)}
 				{@const isActive = page.url.pathname === item.href}
 				<a
 					class="nav-item"
 					class:active={isActive}
-						href={item.href}
+					href={item.href}
 					aria-current={isActive ? 'page' : undefined}
 				>
 					<Icon name={item.icon} size={18} />
@@ -191,11 +203,17 @@
 	.sidebar-top {
 		padding: 21px 15px 0;
 	}
+	.brand-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 23px;
+	}
 	.brand {
 		display: inline-flex;
 		align-items: center;
 		gap: 8px;
-		margin: 0 11px 23px;
+		margin: 0 4px;
 		color: var(--color-heading);
 		font-size: 26px;
 		font-weight: 600;
@@ -208,6 +226,22 @@
 		height: 52px;
 		border-radius: var(--radius-control);
 		object-fit: cover;
+	}
+	.theme-toggle-btn {
+		display: grid;
+		width: 36px;
+		height: 36px;
+		place-items: center;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-control);
+		background: var(--color-surface-raised);
+		color: var(--color-text);
+		cursor: pointer;
+		transition: background 150ms ease, color 150ms ease;
+	}
+	.theme-toggle-btn:hover {
+		background: var(--color-surface-soft);
+		color: var(--color-primary);
 	}
 	.primary-nav {
 		display: grid;
@@ -238,7 +272,7 @@
 		transform: scale(0.985);
 	}
 	.nav-item.active {
-		background: #eee6ff;
+		background: var(--color-accent-soft);
 		color: var(--color-accent);
 	}
 	.ask-kiku-card {
@@ -249,9 +283,9 @@
 		margin-top: 39px;
 		padding: 14px;
 		overflow: hidden;
-		border: 1px solid #eadffd;
+		border: 1px solid var(--color-border);
 		border-radius: var(--radius-card);
-		background: linear-gradient(135deg, #faf6ff, #f5eeff);
+		background: linear-gradient(135deg, var(--color-surface-soft), var(--color-surface-raised));
 	}
 	.ask-kiku-copy {
 		position: relative;
@@ -302,18 +336,18 @@
 		left: 0;
 		right: 0;
 		margin-bottom: 4px;
-		background: #1e1b2e;
-		border: 1px solid #332d4d;
+		background: var(--color-surface-raised);
+		border: 1px solid var(--color-border-strong);
 		border-radius: var(--radius-card);
 		padding: 6px;
 		z-index: 30;
-		box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.3);
+		box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.2);
 	}
 	.dropdown-header {
 		padding: 4px 8px;
 		font-size: 10px;
 		font-weight: 700;
-		color: #94a3b8;
+		color: var(--color-muted);
 		text-transform: uppercase;
 	}
 	.dropdown-item {
@@ -325,29 +359,30 @@
 		background: transparent;
 		border: 0;
 		border-radius: var(--radius-control);
-		color: #e2e8f0;
+		color: var(--color-text);
 		font-size: 12px;
 		cursor: pointer;
 		text-align: left;
 	}
 	.dropdown-item:hover {
-		background: #2a2540;
+		background: var(--color-surface-hover);
 	}
 	.dropdown-item.active {
-		background: #3b2d66;
+		background: var(--color-accent-soft);
+		color: var(--color-accent);
 		font-weight: 600;
 	}
 	.role-badge {
 		font-size: 9px;
 		padding: 2px 6px;
 		border-radius: 4px;
-		background: #475569;
-		color: #f8fafc;
+		background: var(--color-border-strong);
+		color: var(--color-heading);
 	}
 	.logout-item {
-		border-top: 1px solid #332d4d;
+		border-top: 1px solid var(--color-border);
 		margin-top: 4px;
-		color: #f87171;
+		color: var(--color-destructive);
 	}
 	.team-switcher {
 		display: flex;
@@ -370,7 +405,7 @@
 		flex: 0 0 36px;
 		place-items: center;
 		border-radius: var(--radius-control);
-		background: #eee6ff;
+		background: var(--color-accent-soft);
 		color: var(--color-accent);
 	}
 	.team-copy {
@@ -435,7 +470,7 @@
 		border: 1px solid transparent;
 	}
 	.session-item.active {
-		border-color: #eadffd;
+		border-color: var(--color-border-strong);
 		background: var(--color-surface-soft);
 	}
 	.session-link {
@@ -453,7 +488,7 @@
 	.delete-chat-btn {
 		background: transparent;
 		border: none;
-		color: #ef4444;
+		color: var(--color-destructive);
 		font-size: 11px;
 		cursor: pointer;
 		opacity: 0.7;
