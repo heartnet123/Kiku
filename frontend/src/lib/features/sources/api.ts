@@ -16,10 +16,7 @@ export async function fetchWorkspaceSources(workspaceId?: string): Promise<Sourc
 	return apiRequest<SourceItem[]>(`/api/v1/workspaces/${encodeURIComponent(activeId)}/sources`);
 }
 
-export async function uploadWorkspaceSource(workspaceId?: string, file?: File): Promise<SourceItem> {
-	if (!file) {
-		throw new Error('File is required for upload');
-	}
+export async function uploadWorkspaceSource(file: File, workspaceId?: string): Promise<SourceItem> {
 	const activeId = _requireWorkspaceId(workspaceId);
 	const token = getAuthToken();
 	const formData = new FormData();
@@ -33,7 +30,8 @@ export async function uploadWorkspaceSource(workspaceId?: string, file?: File): 
 	const response = await fetch(apiUrl(`/api/v1/workspaces/${encodeURIComponent(activeId)}/sources`), {
 		method: 'POST',
 		headers,
-		body: formData
+		body: formData,
+		credentials: 'include'
 	});
 
 	if (response.status === 401) {

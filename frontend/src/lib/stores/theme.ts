@@ -13,6 +13,12 @@ function getInitialTheme(): Theme {
 
 export const themeStore = writable<Theme>('system');
 
+/**
+ * Resolved dark state, with 'system' collapsed to the OS preference. Read this
+ * instead of comparing $themeStore to 'dark', which misreports under 'system'.
+ */
+export const isDarkStore = writable(false);
+
 let isInitialized = false;
 
 export function applyTheme(theme: Theme) {
@@ -27,6 +33,7 @@ export function applyTheme(theme: Theme) {
 	} else {
 		root.classList.remove('dark');
 	}
+	isDarkStore.set(isDark);
 }
 
 export function initTheme() {

@@ -6,7 +6,7 @@
 	import WorkspaceActions from './WorkspaceActions.svelte';
 	import { authStore, logout, openLoginModal, requireAuth } from '../stores/auth';
 	import { workspaceStore, switchWorkspace } from '../stores/workspace';
-	import { themeStore, toggleTheme } from '../stores/theme';
+	import { isDarkStore, toggleTheme } from '../stores/theme';
 
 	import { listSessions, deleteSession } from '$lib/features/chat/chatApi';
 	import type { ChatSession } from '$lib/features/chat/types';
@@ -21,11 +21,15 @@
 
 	let isDropdownOpen = $state(false);
 	let sessions = $state<ChatSession[]>([]);
+	// Bumped on every reload so a slow response from a previous workspace or
+	// auth state can never overwrite the current list.
+	let loadVersion = 0;
 
 	$effect(() => {
 		const isAuthenticated = $authStore.isAuthenticated;
 		const workspaceId = $workspaceStore.currentWorkspace?.id;
 		if (!isAuthenticated || !workspaceId) {
+			loadVersion += 1;
 			sessions = [];
 			return;
 		}
@@ -33,9 +37,13 @@
 	});
 
 	async function reloadSessions() {
+		const version = ++loadVersion;
 		try {
-			sessions = await listSessions();
-		} catch {}
+			const next = await listSessions();
+			if (version === loadVersion) sessions = next;
+		} catch {
+			// Drop stale failures; a newer load already owns the list.
+		}
 	}
 
 	async function handleDeleteChat(id: string, event: MouseEvent) {
@@ -72,7 +80,7 @@
 				aria-label="Toggle light/dark theme"
 				title="Toggle light/dark theme"
 			>
-				<Icon name={$themeStore === 'dark' ? 'sun' : 'moon'} size={18} />
+				<Icon name={$isDarkStore ? 'sun' : 'moon'} size={18} />
 			</button>
 		</div>
 		<nav class="primary-nav">

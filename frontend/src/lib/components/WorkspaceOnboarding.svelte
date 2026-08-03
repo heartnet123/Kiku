@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { createWorkspace } from '$lib/features/workspaces/api';
 	import { addWorkspace } from '$lib/stores/workspace';
-	import { authStore } from '$lib/stores/auth';
 
 	let name = $state('');
 	let slug = $state('');
@@ -18,11 +17,8 @@
 			return;
 		}
 
-		if (!$authStore.isAuthenticated) {
-			errorMessage = 'Guest users cannot create workspaces. Please sign in.';
-			return;
-		}
-
+		// Only rendered for an authenticated user with no workspace; the backend
+		// rejects unauthenticated creates anyway.
 		isSubmitting = true;
 		errorMessage = null;
 

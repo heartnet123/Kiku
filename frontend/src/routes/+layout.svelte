@@ -3,16 +3,19 @@
 	import AppShell from '$lib/components/AppShell.svelte';
 	import { initFromServer, rehydrateAuth } from '$lib/stores/auth';
 	import { initTheme } from '$lib/stores/theme';
+	import type { LayoutProps } from './$types';
 	import './layout.css';
 	import favicon from '$lib/assets/favicon.svg';
 
-	let { children, data } = $props();
+	let { children, data }: LayoutProps = $props();
 
-	// Pre-hydrate store from SSR auth state and workspaces.
+	// Pre-hydrate the store from SSR state once. Later navigations carry the
+	// original SSR token, so re-applying it would clobber a refreshed one.
+	let hasInitFromServer = false;
 	$effect(() => {
-		if (data.authState) {
-			initFromServer(data.authState, data.workspaces ?? []);
-		}
+		if (hasInitFromServer || !data.authState) return;
+		hasInitFromServer = true;
+		initFromServer(data.authState, data.workspaces ?? []);
 	});
 
 	onMount(async () => {

@@ -3,7 +3,7 @@
 	import { authModalStore, closeLoginModal, rehydrateAuth, setAuthSession } from '../stores/auth';
 	import type { WorkspaceItem, UserProfile } from '../stores/workspace';
 
-	// ponytail: sync mode with authModalStore state
+	// Keep the local mode in sync with authModalStore state.
 	let mode = $state<'login' | 'register'>($authModalStore.mode ?? 'login');
 	$effect(() => {
 		if ($authModalStore.isOpen && $authModalStore.mode) {
@@ -26,7 +26,6 @@
 		try {
 			const response = await apiRequest<{
 				token: string | null;
-				refresh_token?: string | null;
 				user?: UserProfile;
 				workspaces?: WorkspaceItem[];
 				requires_email_confirmation?: boolean;
@@ -48,12 +47,7 @@
 			}
 
 			if (response.user) {
-				setAuthSession(
-					response.token,
-					response.user,
-					response.workspaces ?? [],
-					response.refresh_token ?? null
-				);
+				setAuthSession(response.token, response.user, response.workspaces ?? []);
 			} else {
 				await rehydrateAuth();
 			}

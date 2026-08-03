@@ -28,28 +28,36 @@
 		}
 	});
 
+	// Bumped per request so a slow response from a previous workspace cannot
+	// overwrite the current one's data.
+	let loadVersion = 0;
+
 	async function loadData(targetWorkspaceId?: string) {
 		const activeId = targetWorkspaceId || workspaceId || getCurrentWorkspaceId();
 		if (!isAuthenticated || !activeId) {
+			loadVersion += 1;
 			isLoading = false;
 			sources = [];
 			metrics = null;
 			return;
 		}
 
+		const version = ++loadVersion;
 		isLoading = true;
 		errorMessage = null;
 		try {
 			const [sourcesRes, metricsRes] = await Promise.all([
-				fetchWorkspaceSources(activeId).catch(() => []),
-				fetchSourceMetrics(activeId).catch(() => null)
+				fetchWorkspaceSources(activeId),
+				fetchSourceMetrics(activeId)
 			]);
+			if (version !== loadVersion) return;
 			sources = sourcesRes;
 			metrics = metricsRes;
 		} catch (err: unknown) {
+			if (version !== loadVersion) return;
 			errorMessage = err instanceof Error ? err.message : 'Failed to load knowledge sources.';
 		} finally {
-			isLoading = false;
+			if (version === loadVersion) isLoading = false;
 		}
 	}
 

@@ -56,7 +56,8 @@
 
 	--color-text: #3e4661;
 	--color-heading: #16203f;
-	--color-muted: #82869a;
+	/* 5.1:1 or better on every light surface token, incl. --color-surface-hover. */
+	--color-muted: #5f6478;
 	--color-subtle: #636987;
 
 	--color-primary: #895ddd;

@@ -50,7 +50,7 @@
 
 		try {
 			const activeId = workspaceId || getCurrentWorkspaceId();
-			const source = await uploadWorkspaceSource(activeId, selectedFile);
+			const source = await uploadWorkspaceSource(selectedFile, activeId);
 			onUploaded(source);
 			onClose();
 			selectedFile = null;
