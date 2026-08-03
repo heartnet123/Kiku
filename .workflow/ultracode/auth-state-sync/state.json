@@ -1,8 +1,0 @@
-{
-  "slug": "auth-state-sync",
-  "status": "completed",
-  "plan": ".workflow/ultracode/auth-state-sync/plan.md",
-  "orchestration": ".workflow/ultracode/auth-state-sync/orchestration.md",
-  "integration": ".workflow/ultracode/auth-state-sync/integration.md",
-  "final_report": ".workflow/ultracode/auth-state-sync/final-report.md"
-}
