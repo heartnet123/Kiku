@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { apiRequest } from '../api/client';
-	import { rehydrateAuth } from '../stores/auth';
+	import { rehydrateAuth, setAuthSession } from '../stores/auth';
+	import type { WorkspaceItem, UserProfile } from '../stores/workspace';
 
 	let mode = $state<'login' | 'register'>('login');
 	let email = $state(import.meta.env.DEV ? 'admin@acme.com' : '');
@@ -17,7 +18,13 @@
 		isLoading = true;
 
 		try {
-			const response = await apiRequest<{ token: string | null; requires_email_confirmation?: boolean }>(
+			const response = await apiRequest<{
+				token: string | null;
+				refresh_token?: string | null;
+				user?: UserProfile;
+				workspaces?: WorkspaceItem[];
+				requires_email_confirmation?: boolean;
+			}>(
 				'/api/v1/auth/' + (mode === 'login' ? 'login' : 'register'),
 				{
 					method: 'POST',
@@ -34,9 +41,16 @@
 				return;
 			}
 
-			// Backend already set the HttpOnly cookie via Set-Cookie.
-			// Hydrate the store from the cookie by calling /me.
-			await rehydrateAuth();
+			if (response.user) {
+				setAuthSession(
+					response.token,
+					response.user,
+					response.workspaces ?? [],
+					response.refresh_token ?? null
+				);
+			} else {
+				await rehydrateAuth();
+			}
 		} catch (error: unknown) {
 			errorMessage = error instanceof Error ? error.message : 'Authentication failed.';
 		} finally {
