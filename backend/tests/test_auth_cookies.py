@@ -23,6 +23,13 @@ def _mock_login_response():
     return response
 
 
+def _assert_access_cookie_hardened(response):
+    set_cookie_headers = [v for k, v in response.headers.items() if k.lower() == "set-cookie"]
+    access_header = next((h for h in set_cookie_headers if "kiku_access_token" in h), "")
+    assert "HttpOnly" in access_header
+    assert "samesite=lax" in access_header.lower()
+
+
 def test_login_sets_httponly_cookies(client):
     mock_resp = _mock_login_response()
     with patch("app.api.v1.routes.auth_routes.create_supabase_client") as mock_sb:
@@ -39,9 +46,73 @@ def test_login_sets_httponly_cookies(client):
     assert "SameSite=lax" in access_header.lower() or "samesite=lax" in access_header.lower()
 
 
+def test_register_sets_httponly_cookies(client):
+    mock_resp = _mock_login_response()
+    with patch("app.api.v1.routes.auth_routes.create_supabase_client") as mock_sb:
+        sb = MagicMock()
+        sb.auth.sign_up.return_value = mock_resp
+        sb.table.return_value.select.return_value.eq.return_value.execute.return_value.data = []
+        mock_sb.return_value = sb
+        r = client.post(
+            "/api/v1/auth/register",
+            json={"email": "test@example.com", "password": "password1", "full_name": "Test User"},
+        )
+
+    assert r.status_code == 201
+    _assert_access_cookie_hardened(r)
+
+
+def test_refresh_reads_refresh_cookie(client):
+    """POST /auth/refresh must work off the HttpOnly cookie with no request body token."""
+    mock_resp = _mock_login_response()
+    with patch("app.api.v1.routes.auth_routes.create_supabase_client") as mock_sb:
+        sb = MagicMock()
+        sb.auth.refresh_session.return_value = mock_resp
+        sb.table.return_value.select.return_value.eq.return_value.execute.return_value.data = []
+        mock_sb.return_value = sb
+        r = client.post(
+            "/api/v1/auth/refresh",
+            json={},
+            cookies={"kiku_refresh_token": "cookie-refresh"},
+        )
+        sb.auth.refresh_session.assert_called_once_with("cookie-refresh")
+
+    assert r.status_code == 200
+    _assert_access_cookie_hardened(r)
+
+
+def test_refresh_without_token_is_unauthorized(client):
+    r = client.post("/api/v1/auth/refresh", json={})
+    assert r.status_code == 401
+
+
 def test_logout_clears_cookies(client):
     r = client.post("/api/v1/auth/logout")
     assert r.status_code in (200, 204)
+    set_cookie_headers = [v for k, v in r.headers.items() if k.lower() == "set-cookie"]
+    access_header = next((h for h in set_cookie_headers if "kiku_access_token" in h), "")
+    assert "Max-Age=0" in access_header or "max-age=0" in access_header.lower()
+
+
+def test_logout_revokes_supabase_session(client):
+    with patch("app.api.v1.routes.auth_routes.create_supabase_client") as mock_sb:
+        admin = MagicMock()
+        mock_sb.return_value = admin
+        r = client.post("/api/v1/auth/logout", cookies={"kiku_access_token": "tok-abc"})
+        mock_sb.assert_called_once_with(service_role=True)
+        admin.auth.admin.sign_out.assert_called_once_with("tok-abc")
+
+    assert r.status_code == 204
+
+
+def test_logout_reports_revocation_failure_but_still_clears_cookies(client):
+    with patch("app.api.v1.routes.auth_routes.create_supabase_client") as mock_sb:
+        admin = MagicMock()
+        admin.auth.admin.sign_out.side_effect = RuntimeError("gotrue down")
+        mock_sb.return_value = admin
+        r = client.post("/api/v1/auth/logout", cookies={"kiku_access_token": "tok-abc"})
+
+    assert r.status_code == 502
     set_cookie_headers = [v for k, v in r.headers.items() if k.lower() == "set-cookie"]
     access_header = next((h for h in set_cookie_headers if "kiku_access_token" in h), "")
     assert "Max-Age=0" in access_header or "max-age=0" in access_header.lower()

@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi.responses import JSONResponse
 
 import httpx
 try:
@@ -7,6 +8,7 @@ except ImportError:
     AuthApiError = Exception
     AuthRetryableError = Exception
 
+from app.core.config import settings
 from app.core.auth import (
     _build_user_workspaces,
     _login_response,
@@ -52,8 +54,8 @@ def _sync_public_user(user: User, token: str | None = None) -> None:
 
 
 def _set_auth_cookies(response: Response, token: str | None, refresh_token: str | None, max_age: int = 3600) -> None:
-    """Attach HttpOnly session cookies. Set secure=True behind a TLS proxy in production."""
-    kwargs: dict = dict(httponly=True, samesite="lax", secure=False)
+    """Attach HttpOnly session cookies. secure follows settings.cookie_secure (HTTPS origins)."""
+    kwargs: dict = dict(httponly=True, samesite="lax", secure=settings.cookie_secure)
     if token:
         response.set_cookie("kiku_access_token", token, max_age=max_age, **kwargs)
     if refresh_token:
@@ -61,8 +63,9 @@ def _set_auth_cookies(response: Response, token: str | None, refresh_token: str 
 
 
 def _clear_auth_cookies(response: Response) -> None:
-    response.delete_cookie("kiku_access_token", httponly=True, samesite="lax")
-    response.delete_cookie("kiku_refresh_token", httponly=True, samesite="lax")
+    kwargs: dict = dict(httponly=True, samesite="lax", secure=settings.cookie_secure)
+    response.delete_cookie("kiku_access_token", **kwargs)
+    response.delete_cookie("kiku_refresh_token", **kwargs)
 
 
 @router.post("/register", response_model=LoginResponse, status_code=status.HTTP_201_CREATED)
@@ -173,7 +176,19 @@ async def get_me(
 
 
 @router.post("/refresh", response_model=LoginResponse)
-async def refresh_session(request: RefreshTokenRequest, response: Response) -> LoginResponse:
+async def refresh_session(
+    payload: RefreshTokenRequest,
+    request: Request,
+    response: Response,
+) -> LoginResponse:
+    # Browsers never see the refresh token; it arrives only as an HttpOnly cookie.
+    refresh_token = payload.refresh_token or request.cookies.get("kiku_refresh_token")
+    if not refresh_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token is missing.",
+        )
+
     client = create_supabase_client()
     if not client:
         raise HTTPException(
@@ -182,7 +197,7 @@ async def refresh_session(request: RefreshTokenRequest, response: Response) -> L
         )
 
     try:
-        response_auth = client.auth.refresh_session(request.refresh_token)
+        response_auth = client.auth.refresh_session(refresh_token)
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -209,6 +224,32 @@ async def refresh_session(request: RefreshTokenRequest, response: Response) -> L
     )
 
 
-@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-async def logout_endpoint(response: Response) -> None:
-    _clear_auth_cookies(response)
+@router.post("/logout")
+async def logout_endpoint(request: Request) -> Response:
+    """Revoke the Supabase session, then drop the cookies regardless of outcome."""
+    token = request.cookies.get("kiku_access_token")
+    if not token:
+        header = request.headers.get("authorization") or ""
+        if header.lower().startswith("bearer "):
+            token = header[7:].strip() or None
+
+    revoke_error: str | None = None
+    if token:
+        admin = create_supabase_client(service_role=True)
+        if not admin:
+            revoke_error = "Session revocation unavailable: service role key is not configured."
+        else:
+            try:
+                admin.auth.admin.sign_out(token)
+            except Exception as exc:
+                # ponytail: an already-expired token also lands here; treat as a
+                # reported failure, split on error type if the noise matters.
+                revoke_error = f"Session revocation failed: {exc}"
+
+    result: Response = (
+        JSONResponse({"detail": revoke_error}, status_code=status.HTTP_502_BAD_GATEWAY)
+        if revoke_error
+        else Response(status_code=status.HTTP_204_NO_CONTENT)
+    )
+    _clear_auth_cookies(result)
+    return result

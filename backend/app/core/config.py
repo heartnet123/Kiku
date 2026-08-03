@@ -14,6 +14,13 @@ class Settings:
     supabase_url: str = os.getenv("SUPABASE_URL", "")
     supabase_key: str = os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_ANON_KEY", "")
     supabase_service_role_key: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+
+    # Session cookies ride TLS whenever the frontend is served over HTTPS.
+    cookie_secure: bool = (
+        os.getenv("KIKU_COOKIE_SECURE") or ""
+    ).strip().lower() in {"1", "true", "yes"} or os.getenv(
+        "KIKU_FRONTEND_ORIGIN", "http://localhost:5173"
+    ).startswith("https://")
     
     # Opencode LLM Synthesis Configuration
     opencode_api_base_url: str = os.getenv("OPENCODE_API_BASE_URL", "https://opencode.ai/zen/v1")
