@@ -1,6 +1,6 @@
 import { env } from '$env/dynamic/public';
 import { apiRequest } from '$lib/api/client';
-import { getAuthToken, logout } from '$lib/stores/workspace';
+import { getAuthToken, logout } from '$lib/stores/auth';
 import type { IngestionMetrics, SourceItem, SourceVersion } from './types';
 
 const apiBaseUrl = (env.PUBLIC_API_BASE_URL ?? '').replace(/\/$/, '');

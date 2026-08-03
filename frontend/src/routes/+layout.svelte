@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import AppShell from '$lib/components/AppShell.svelte';
-	import { rehydrateAuth } from '$lib/stores/workspace';
+	import { rehydrateAuth } from '$lib/stores/auth';
 	import './layout.css';
 	import favicon from '$lib/assets/favicon.svg';
 

@@ -1,0 +1,11 @@
+{
+  "slug": "auth-refactor-phase1",
+  "status": "COMPLETED",
+  "current_phase": "done",
+  "packets": [
+    { "id": "p1", "name": "auth.ts store & auto-refresh", "status": "completed" },
+    { "id": "p2", "name": "workspace.ts decoupling", "status": "completed" },
+    { "id": "p3", "name": "LoginModal.svelte cleanup", "status": "completed" },
+    { "id": "p4", "name": "Import migration & tests", "status": "completed" }
+  ]
+}

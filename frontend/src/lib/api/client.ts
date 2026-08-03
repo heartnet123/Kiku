@@ -1,5 +1,5 @@
 import { env } from '$env/dynamic/public';
-import { getAuthToken, logout } from '../stores/workspace';
+import { getAuthToken, logout } from '../stores/auth';
 
 const apiBaseUrl = (env.PUBLIC_API_BASE_URL ?? '').replace(/\/$/, '');
 

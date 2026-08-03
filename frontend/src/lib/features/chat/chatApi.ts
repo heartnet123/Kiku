@@ -1,6 +1,7 @@
 import type { ChatCitation, ChatMessage, ChatSession } from './types';
 import { apiRequest, apiUrl, authHeaders } from '$lib/api/client';
-import { getCurrentWorkspaceId, logout } from '$lib/stores/workspace';
+import { logout } from '$lib/stores/auth';
+import { getCurrentWorkspaceId } from '$lib/stores/workspace';
 
 export type ChatStatus =
 	| 'retrieving_sources'

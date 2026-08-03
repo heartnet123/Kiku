@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { authStore } from '$lib/stores/workspace';
+	import { workspaceStore } from '$lib/stores/workspace';
 	import { fetchSourceMetrics, fetchWorkspaceSources } from '$lib/features/sources/api';
 	import type { IngestionMetrics, SourceItem } from '$lib/features/sources/types';
 	import SourcesList from '$lib/features/sources/SourcesList.svelte';
@@ -14,8 +14,8 @@
 	let isUploadModalOpen = $state(false);
 
 	$effect(() => {
-		if ($authStore.currentWorkspace) {
-			workspaceId = $authStore.currentWorkspace.id;
+		if ($workspaceStore.currentWorkspace) {
+			workspaceId = $workspaceStore.currentWorkspace.id;
 			loadData();
 		}
 	});
@@ -38,8 +38,8 @@
 	}
 
 	onMount(() => {
-		if ($authStore.currentWorkspace) {
-			workspaceId = $authStore.currentWorkspace.id;
+		if ($workspaceStore.currentWorkspace) {
+			workspaceId = $workspaceStore.currentWorkspace.id;
 		}
 		loadData();
 	});

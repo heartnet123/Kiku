@@ -4,7 +4,8 @@
 	import Icon, { type IconName } from '$lib/components/Icon.svelte';
 	import KikuMascot from '$lib/components/KikuMascot.svelte';
 	import WorkspaceActions from './WorkspaceActions.svelte';
-	import { authStore, logout, switchWorkspace } from '../stores/workspace';
+	import { authStore, logout } from '../stores/auth';
+	import { workspaceStore, switchWorkspace } from '../stores/workspace';
 
 	import { listSessions, deleteSession } from '$lib/features/chat/chatApi';
 	import type { ChatSession } from '$lib/features/chat/types';
@@ -22,7 +23,7 @@
 
 	$effect(() => {
 		const isAuthenticated = $authStore.isAuthenticated;
-		const workspaceId = $authStore.currentWorkspace?.id;
+		const workspaceId = $workspaceStore.currentWorkspace?.id;
 		if (!isAuthenticated || !workspaceId) {
 			sessions = [];
 			return;
@@ -113,11 +114,11 @@
 		{#if isDropdownOpen && $authStore.isAuthenticated}
 			<div class="workspace-dropdown">
 				<div class="dropdown-header">Workspaces</div>
-				{#each $authStore.workspaces as ws}
+				{#each $workspaceStore.workspaces as ws}
 					<button
 						type="button"
 						class="dropdown-item"
-						class:active={ws.id === $authStore.currentWorkspace?.id}
+						class:active={ws.id === $workspaceStore.currentWorkspace?.id}
 						onclick={() => {
 							switchWorkspace(ws.id);
 							isDropdownOpen = false;
@@ -144,10 +145,10 @@
 		<button class="team-switcher" type="button" onclick={toggleDropdown} aria-label="Switch team">
 			<span class="team-icon"><Icon name="users" size={20} /></span>
 			<span class="team-copy">
-				<strong>{$authStore.currentWorkspace?.name ?? 'Sign In Required'}</strong>
+				<strong>{$workspaceStore.currentWorkspace?.name ?? 'Sign In Required'}</strong>
 				<small
 					>{$authStore.user
-						? `${$authStore.user.full_name} (${$authStore.currentWorkspace?.role?.toUpperCase() || 'GUEST'})`
+						? `${$authStore.user.full_name} (${$workspaceStore.currentWorkspace?.role?.toUpperCase() || 'GUEST'})`
 						: 'Click to sign in'}</small
 				>
 			</span>

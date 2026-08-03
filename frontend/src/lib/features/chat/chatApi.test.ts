@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { logout, setAuthSession } from '$lib/stores/workspace';
+import { logout, setAuthSession } from '$lib/stores/auth';
 import { createSession, streamChatMessage } from './chatApi';
 
 describe('chat API', () => {
