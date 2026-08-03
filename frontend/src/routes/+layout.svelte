@@ -9,9 +9,11 @@
 
 	// Pre-hydrate store from SSR auth state (no network call needed for isAuthenticated).
 	// Workspaces are still fetched client-side via rehydrateAuth below.
-	if (data.authState) {
-		initFromServer(data.authState, []);
-	}
+	$effect(() => {
+		if (data.authState) {
+			initFromServer(data.authState, []);
+		}
+	});
 
 	onMount(async () => {
 		// Always call rehydrateAuth to populate workspaces from /me.
