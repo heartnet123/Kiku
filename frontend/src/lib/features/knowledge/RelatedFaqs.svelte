@@ -22,8 +22,8 @@
 		padding: 22px 18px 9px;
 		border: 1px solid var(--color-border);
 		border-radius: var(--radius-card);
-		background: #ffffff;
-		box-shadow: 0 5px 17px rgba(52, 41, 94, 0.035);
+		background: var(--color-surface);
+		box-shadow: 0 5px 17px rgba(0, 0, 0, 0.04);
 	}
 	h2 {
 		margin: 0;

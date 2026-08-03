@@ -1,10 +1,11 @@
 import { env } from '$env/dynamic/public';
-import { getAuthToken, logout } from '../stores/workspace';
+import { getAuthToken, logout } from '../stores/auth';
 
 const apiBaseUrl = (env.PUBLIC_API_BASE_URL ?? '').replace(/\/$/, '');
 
 export function apiUrl(path: string): string {
-	return apiBaseUrl + path;
+	const rawUrl = apiBaseUrl ? `${apiBaseUrl}/${path.replace(/^\//, '')}` : path;
+	return rawUrl.replace(/([^:]\/)\/+/g, '$1');
 }
 
 export function authHeaders(): Record<string, string> {
@@ -18,7 +19,7 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
 		...authHeaders(),
 		...((init?.headers as Record<string, string>) ?? {})
 	};
-	const response = await fetch(apiUrl(path), { ...init, headers });
+	const response = await fetch(apiUrl(path), { ...init, headers, credentials: 'include' });
 
 	if (response.status === 401) {
 		logout();

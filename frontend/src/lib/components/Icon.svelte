@@ -10,6 +10,8 @@
 		| 'search'
 		| 'settings'
 		| 'sparkle'
+		| 'sun'
+		| 'moon'
 		| 'users';
 
 	const icons: Record<IconName, string> = {
@@ -23,6 +25,8 @@
 		search: 'solar:magnifer-linear',
 		settings: 'solar:settings-linear',
 		sparkle: 'solar:stars-minimalistic-linear',
+		sun: 'solar:sun-2-linear',
+		moon: 'solar:moon-stars-linear',
 		users: 'solar:users-group-rounded-linear'
 	};
 

@@ -1,24 +1,97 @@
 @import 'tailwindcss';
 
+@theme {
+	--color-bg: var(--color-bg);
+	--color-surface: var(--color-surface);
+	--color-surface-raised: var(--color-surface-raised);
+	--color-surface-soft: var(--color-surface-soft);
+	--color-surface-hover: var(--color-surface-hover);
+
+	--color-border: var(--color-border);
+	--color-border-strong: var(--color-border-strong);
+
+	--color-text: var(--color-text);
+	--color-heading: var(--color-heading);
+	--color-muted: var(--color-muted);
+	--color-subtle: var(--color-subtle);
+
+	--color-primary: var(--color-primary);
+	--color-primary-hover: var(--color-primary-hover);
+	--color-primary-fg: var(--color-primary-fg);
+
+	--color-accent: var(--color-accent);
+	--color-accent-soft: var(--color-accent-soft);
+	--color-accent-strong: var(--color-accent-strong);
+
+	--color-success: var(--color-success);
+	--color-success-soft: var(--color-success-soft);
+	--color-success-border: var(--color-success-border);
+	--color-success-fg: var(--color-success-fg);
+
+	--color-warning: var(--color-warning);
+	--color-warning-soft: var(--color-warning-soft);
+	--color-warning-border: var(--color-warning-border);
+	--color-warning-fg: var(--color-warning-fg);
+
+	--color-destructive: var(--color-destructive);
+	--color-destructive-hover: var(--color-destructive-hover);
+	--color-destructive-soft: var(--color-destructive-soft);
+	--color-destructive-border: var(--color-destructive-border);
+	--color-destructive-fg: var(--color-destructive-fg);
+
+	--color-overlay: var(--color-overlay);
+	--color-focus-ring: var(--color-focus-ring);
+}
+
 :root {
 	--ui-scale: 1;
 	--color-bg: #fcfbff;
 	--color-surface: #ffffff;
-	--color-surface-raised: #ffffff;
-	--color-surface-soft: #f6f2ff;
+	--color-surface-raised: #f8f6fc;
+	--color-surface-soft: #f3edfd;
+	--color-surface-hover: #ede4fc;
+
 	--color-border: #e6e3ef;
 	--color-border-strong: #ded9ea;
+
 	--color-text: #3e4661;
 	--color-heading: #16203f;
-	--color-muted: #82869a;
+	/* 5.1:1 or better on every light surface token, incl. --color-surface-hover. */
+	--color-muted: #5f6478;
 	--color-subtle: #636987;
+
+	--color-primary: #895ddd;
+	--color-primary-hover: #7546cc;
+	--color-primary-fg: #ffffff;
+
 	--color-accent: #895ddd;
-	--color-accent-strong: #895ddd;
-	--color-success: #43b78a;
+	--color-accent-soft: #eee6ff;
+	--color-accent-strong: #7546cc;
+
+	--color-success: #10b981;
+	--color-success-soft: #ecfdf5;
+	--color-success-border: #a7f3d0;
+	--color-success-fg: #047857;
+
+	--color-warning: #f59e0b;
+	--color-warning-soft: #fffbeb;
+	--color-warning-border: #fde68a;
+	--color-warning-fg: #b45309;
+
+	--color-destructive: #ef4444;
+	--color-destructive-hover: #dc2626;
+	--color-destructive-soft: #fef2f2;
+	--color-destructive-border: #fecaca;
+	--color-destructive-fg: #991b1b;
+
+	--color-overlay: rgba(15, 23, 42, 0.6);
+	--color-focus-ring: rgba(137, 93, 221, 0.4);
+
 	--font-sans: 'Inter', sans-serif;
 	--radius-card: 16px;
 	--radius-control: 12px;
 	--radius-pill: 9999px;
+
 	font-family: var(--font-sans);
 	color: var(--color-text);
 	background: var(--color-bg);
@@ -26,8 +99,52 @@
 	text-rendering: optimizeLegibility;
 }
 
+html.dark {
+	--color-bg: #0b0f19;
+	--color-surface: #111827;
+	--color-surface-raised: #1f2937;
+	--color-surface-soft: #1e1b2e;
+	--color-surface-hover: #374151;
+
+	--color-border: #1f2937;
+	--color-border-strong: #374151;
+
+	--color-text: #e2e8f0;
+	--color-heading: #f8fafc;
+	--color-muted: #94a3b8;
+	--color-subtle: #cbd5e1;
+
+	--color-primary: #895ddd;
+	--color-primary-hover: #9d75e8;
+	--color-primary-fg: #ffffff;
+
+	--color-accent: #a78bfa;
+	--color-accent-soft: #2e234a;
+	--color-accent-strong: #c4b5fd;
+
+	--color-success: #10b981;
+	--color-success-soft: #064e3b;
+	--color-success-border: #047857;
+	--color-success-fg: #6ee7b7;
+
+	--color-warning: #f59e0b;
+	--color-warning-soft: #78350f;
+	--color-warning-border: #b45309;
+	--color-warning-fg: #fde68a;
+
+	--color-destructive: #ef4444;
+	--color-destructive-hover: #f87171;
+	--color-destructive-soft: #451a1a;
+	--color-destructive-border: #7f1d1d;
+	--color-destructive-fg: #fca5a5;
+
+	--color-overlay: rgba(0, 0, 0, 0.75);
+	--color-focus-ring: rgba(167, 139, 250, 0.5);
+}
+
 html {
 	background: var(--color-bg);
+	color: var(--color-text);
 }
 
 body {
@@ -44,8 +161,11 @@ body {
 }
 
 button,
-input {
+input,
+textarea,
+select {
 	font: inherit;
+	color: inherit;
 }
 
 button,
@@ -55,8 +175,10 @@ a {
 
 button:focus-visible,
 a:focus-visible,
-input:focus-visible {
-	outline: 2px solid rgba(137, 93, 221, 0.32);
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+	outline: 2px solid var(--color-focus-ring);
 	outline-offset: 3px;
 }
 
@@ -70,6 +192,7 @@ iconify-icon {
 	display: flex;
 	min-height: calc(100vh / var(--ui-scale));
 	background: var(--color-bg);
+	color: var(--color-text);
 }
 
 .main-content {

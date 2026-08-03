@@ -34,3 +34,8 @@ Thumbs.db
 .vscode/
 .idea/
 
+# Ignore workflow and sql files locally
+.workflow/
+*.sql
+
+

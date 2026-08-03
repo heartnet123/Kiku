@@ -8,7 +8,11 @@ class LoginRequest(BaseModel):
 
 
 class RefreshTokenRequest(BaseModel):
-    refresh_token: str = Field(..., description="Supabase refresh token for session renewal")
+    # Browsers rely on the HttpOnly kiku_refresh_token cookie; non-browser
+    # clients may still pass the token explicitly.
+    refresh_token: str | None = Field(
+        default=None, description="Supabase refresh token for session renewal"
+    )
 
 
 class RegisterRequest(BaseModel):
@@ -28,6 +32,9 @@ class WorkspaceResponse(BaseModel):
     name: str
     slug: str
     role: Role
+    owner_id: str | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
 
 
 class LoginResponse(BaseModel):

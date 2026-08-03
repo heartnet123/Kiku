@@ -1,15 +1,23 @@
-import { env } from '$env/dynamic/public';
-import { apiRequest } from '$lib/api/client';
-import { getAuthToken, logout } from '$lib/stores/workspace';
+import { apiRequest, apiUrl } from '$lib/api/client';
+import { getAuthToken, logout } from '$lib/stores/auth';
+import { getCurrentWorkspaceId } from '$lib/stores/workspace';
 import type { IngestionMetrics, SourceItem, SourceVersion } from './types';
 
-const apiBaseUrl = (env.PUBLIC_API_BASE_URL ?? '').replace(/\/$/, '');
-
-export async function fetchWorkspaceSources(workspaceId: string): Promise<SourceItem[]> {
-	return apiRequest<SourceItem[]>(`/api/v1/workspaces/${workspaceId}/sources`);
+function _requireWorkspaceId(id?: string): string {
+	const activeId = id || getCurrentWorkspaceId();
+	if (!activeId) {
+		throw new Error('Workspace ID is required.');
+	}
+	return activeId;
 }
 
-export async function uploadWorkspaceSource(workspaceId: string, file: File): Promise<SourceItem> {
+export async function fetchWorkspaceSources(workspaceId?: string): Promise<SourceItem[]> {
+	const activeId = _requireWorkspaceId(workspaceId);
+	return apiRequest<SourceItem[]>(`/api/v1/workspaces/${encodeURIComponent(activeId)}/sources`);
+}
+
+export async function uploadWorkspaceSource(file: File, workspaceId?: string): Promise<SourceItem> {
+	const activeId = _requireWorkspaceId(workspaceId);
 	const token = getAuthToken();
 	const formData = new FormData();
 	formData.append('file', file);
@@ -19,10 +27,11 @@ export async function uploadWorkspaceSource(workspaceId: string, file: File): Pr
 		headers['Authorization'] = `Bearer ${token}`;
 	}
 
-	const response = await fetch(`${apiBaseUrl}/api/v1/workspaces/${workspaceId}/sources`, {
+	const response = await fetch(apiUrl(`/api/v1/workspaces/${encodeURIComponent(activeId)}/sources`), {
 		method: 'POST',
 		headers,
-		body: formData
+		body: formData,
+		credentials: 'include'
 	});
 
 	if (response.status === 401) {
@@ -46,8 +55,9 @@ export async function retryWorkspaceSource(
 	workspaceId: string,
 	sourceId: string
 ): Promise<{ status: string; message: string }> {
+	const activeId = _requireWorkspaceId(workspaceId);
 	return apiRequest<{ status: string; message: string }>(
-		`/api/v1/workspaces/${workspaceId}/sources/${sourceId}/retry`,
+		`/api/v1/workspaces/${encodeURIComponent(activeId)}/sources/${encodeURIComponent(sourceId)}/retry`,
 		{ method: 'POST' }
 	);
 }
@@ -56,11 +66,15 @@ export async function fetchSourceVersions(
 	workspaceId: string,
 	sourceId: string
 ): Promise<SourceVersion[]> {
+	const activeId = _requireWorkspaceId(workspaceId);
 	return apiRequest<SourceVersion[]>(
-		`/api/v1/workspaces/${workspaceId}/sources/${sourceId}/versions`
+		`/api/v1/workspaces/${encodeURIComponent(activeId)}/sources/${encodeURIComponent(sourceId)}/versions`
 	);
 }
 
-export async function fetchSourceMetrics(workspaceId: string): Promise<IngestionMetrics> {
-	return apiRequest<IngestionMetrics>(`/api/v1/workspaces/${workspaceId}/sources/metrics`);
+export async function fetchSourceMetrics(workspaceId?: string): Promise<IngestionMetrics | null> {
+	const activeId = _requireWorkspaceId(workspaceId);
+	return apiRequest<IngestionMetrics>(
+		`/api/v1/workspaces/${encodeURIComponent(activeId)}/sources/metrics`
+	);
 }
