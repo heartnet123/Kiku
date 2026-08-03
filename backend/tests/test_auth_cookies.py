@@ -45,3 +45,17 @@ def test_logout_clears_cookies(client):
     set_cookie_headers = [v for k, v in r.headers.items() if k.lower() == "set-cookie"]
     access_header = next((h for h in set_cookie_headers if "kiku_access_token" in h), "")
     assert "Max-Age=0" in access_header or "max-age=0" in access_header.lower()
+
+
+def test_me_endpoint_reads_cookie(client):
+    """GET /auth/me must work when token arrives via cookie, not Bearer header."""
+    fake_token = "h.eyJzdWIiOiJ1c2VyLTEyMyIsImV4cCI6OTk5OTk5OTk5OX0.sig"
+    with patch("app.core.auth._verify_supabase_token") as mock_verify:
+        from app.domain.identity import User
+        mock_verify.return_value = User(id="u1", email="t@t.com", full_name="T", password_hash="")
+        with patch("app.api.v1.routes.auth_routes.create_supabase_client") as mock_sb:
+            sb = MagicMock()
+            sb.table.return_value.select.return_value.eq.return_value.execute.return_value.data = []
+            mock_sb.return_value = sb
+            r = client.get("/api/v1/auth/me", cookies={"kiku_access_token": fake_token})
+    assert r.status_code == 200

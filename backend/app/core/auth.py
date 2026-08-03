@@ -2,7 +2,7 @@ from dataclasses import dataclass
 import secrets
 from typing import Any
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from supabase import Client
 
@@ -15,15 +15,21 @@ security = HTTPBearer(auto_error=False)
 
 
 def get_access_token(
+    request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
 ) -> str:
-    if not credentials or not credentials.credentials:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication required. Missing Bearer token.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    return credentials.credentials
+    # Prefer Authorization: Bearer (keeps curl / Postman compatibility)
+    if credentials and credentials.credentials:
+        return credentials.credentials
+    # Fall back to HttpOnly cookie (browser sessions)
+    cookie_token = request.cookies.get("kiku_access_token")
+    if cookie_token:
+        return cookie_token
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Authentication required. Missing Bearer token or session cookie.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
 
 
 def _role(value: str | Role) -> Role:

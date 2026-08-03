@@ -1,9 +1,11 @@
-// See https://svelte.dev/docs/kit/types#app.d.ts
-// for information about these interfaces
+import type { AuthState } from '$lib/stores/auth';
+
 declare global {
 	namespace App {
 		// interface Error {}
-		// interface Locals {}
+		interface Locals {
+			authState: AuthState | null;
+		}
 		// interface PageData {}
 		// interface PageState {}
 		// interface Platform {}
