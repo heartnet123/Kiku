@@ -85,23 +85,25 @@ async def create_workspace(
     if not client:
         raise HTTPException(status_code=503, detail="Supabase connection is not configured.")
 
-    # Check if slug already exists
+    # Check if slug already exists. The DB owns the real guarantee (unique index on
+    # workspaces.slug), so this only turns the common case into a clearer error.
     try:
         existing = response_data(
             client.table("workspaces").select("id").eq("slug", slug).execute()
         )
-        if existing:
-            # If slug was custom, return 409 conflict; if auto-generated, make it unique
-            if request.slug:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=f"Workspace with slug '{slug}' already exists.",
-                )
-            slug = f"{slug[:55]}-{uuid.uuid4().hex[:6]}"
-    except HTTPException:
-        raise
-    except Exception:
-        pass
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503, detail="Unable to verify workspace slug availability."
+        ) from exc
+
+    if existing:
+        # If slug was custom, return 409 conflict; if auto-generated, make it unique
+        if request.slug:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Workspace with slug '{slug}' already exists.",
+            )
+        slug = f"{slug[:55]}-{uuid.uuid4().hex[:6]}"
 
     try:
         rows = response_data(
