@@ -52,16 +52,16 @@
 	}
 </script>
 
-<div class="min-h-screen bg-slate-950 p-6 text-slate-100 md:p-10">
+<div class="min-h-screen bg-bg p-6 text-text md:p-10">
 	<div class="mx-auto max-w-6xl space-y-8">
 		<!-- Header -->
 		<div
-			class="flex flex-col justify-between gap-4 border-b border-white/10 pb-6 sm:flex-row sm:items-center"
+			class="flex flex-col justify-between gap-4 border-b border-border pb-6 sm:flex-row sm:items-center"
 		>
 			<div>
 				<div class="flex items-center gap-3">
 					<div
-						class="rounded-xl border border-indigo-500/20 bg-indigo-600/20 p-2.5 text-indigo-400"
+						class="rounded-xl border border-border bg-accent-soft p-2.5 text-accent"
 					>
 						<svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 							<path
@@ -73,8 +73,8 @@
 						</svg>
 					</div>
 					<div>
-						<h1 class="text-3xl font-extrabold tracking-tight text-white">Knowledge Sources</h1>
-						<p class="mt-0.5 text-sm text-slate-400">
+						<h1 class="text-3xl font-extrabold tracking-tight text-heading">Knowledge Sources</h1>
+						<p class="mt-0.5 text-sm text-muted">
 							Workspace-scoped LlamaIndex ingestion pipeline & Supabase vector store management.
 						</p>
 					</div>
@@ -85,7 +85,7 @@
 				<button
 					onclick={() => loadData()}
 					disabled={isLoading}
-					class="flex items-center gap-2 rounded-xl border border-white/10 bg-slate-900 px-4 py-2.5 text-sm font-semibold text-slate-300 transition hover:bg-slate-800 hover:text-white disabled:opacity-50"
+					class="flex items-center gap-2 rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-text transition hover:bg-surface-raised hover:text-heading disabled:opacity-50"
 				>
 					<svg
 						class={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`}
@@ -104,7 +104,7 @@
 				</button>
 				<button
 					onclick={handleAddSource}
-					class="flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition hover:bg-indigo-500"
+					class="flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-fg shadow-lg transition hover:bg-primary-hover"
 				>
 					<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 						<path
@@ -120,15 +120,15 @@
 		</div>
 
 		{#if errorMessage}
-			<div class="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
+			<div class="rounded-xl border border-destructive-border bg-destructive-soft p-4 text-sm text-destructive-fg">
 				{errorMessage}
 			</div>
 		{/if}
 
 		{#if isLoading && sources.length === 0}
 			<div class="flex items-center justify-center py-20">
-				<div class="flex flex-col items-center gap-3 text-slate-400">
-					<svg class="h-8 w-8 animate-spin text-indigo-400" fill="none" viewBox="0 0 24 24">
+				<div class="flex flex-col items-center gap-3 text-muted">
+					<svg class="h-8 w-8 animate-spin text-accent" fill="none" viewBox="0 0 24 24">
 						<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"
 						></circle>
 						<path
