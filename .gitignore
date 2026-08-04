@@ -3,6 +3,12 @@
 .omc/
 .serena/
 .codegraph/
+.clinerules/
+.cursor/
+.opencode/
+.windsurf/
+.github/
+AGENTS.md
 .venv/
 docs/
 ROADMAP.html
