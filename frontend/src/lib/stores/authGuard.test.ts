@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { get } from 'svelte/store';
 import {
 	authStore,
@@ -13,7 +13,12 @@ import {
 
 describe('YAGNI Auth Guard & Modal Intercept Flow', () => {
 	const mockUser = { id: 'usr-guest-1', email: 'guest@example.com', full_name: 'Guest User' };
-	const mockWorkspace = { id: 'ws-1', name: 'Default WS', slug: 'default-ws', role: 'member' as const };
+	const mockWorkspace = {
+		id: 'ws-1',
+		name: 'Default WS',
+		slug: 'default-ws',
+		role: 'member' as const
+	};
 	const mockJwt = 'header.payload.signature';
 
 	afterEach(() => {

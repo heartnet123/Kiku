@@ -4,10 +4,7 @@ import { logout } from '$lib/stores/auth';
 import { getCurrentWorkspaceId } from '$lib/stores/workspace';
 
 export type ChatStatus =
-	| 'retrieving_sources'
-	| 'composing_answer'
-	| 'streaming_answer'
-	| 'completed';
+	'retrieving_sources' | 'composing_answer' | 'streaming_answer' | 'completed';
 
 export interface ChatStreamMetadata {
 	query?: string;
@@ -124,9 +121,7 @@ export async function getMessages(sessionId: string): Promise<ChatMessage[]> {
 }
 
 function resolveHandlers(
-	handlersOrMetadata:
-		| ChatStreamHandlers
-		| ((citations: ChatCitation[]) => void),
+	handlersOrMetadata: ChatStreamHandlers | ((citations: ChatCitation[]) => void),
 	onDeltaOrSignal?: ((content: string) => void) | AbortSignal,
 	onDone?: (() => void) | undefined,
 	signal?: AbortSignal,
@@ -193,15 +188,12 @@ export async function streamChatMessage(
 		onError,
 		onStatus
 	);
-	const response = await fetch(
-		apiUrl(chatBasePath() + sessionPath(sessionId) + '/stream'),
-		{
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json', ...authHeaders() },
-			body: JSON.stringify({ query, category }),
-			signal: resolved.signal
-		}
-	);
+	const response = await fetch(apiUrl(chatBasePath() + sessionPath(sessionId) + '/stream'), {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json', ...authHeaders() },
+		body: JSON.stringify({ query, category }),
+		signal: resolved.signal
+	});
 
 	if (response.status === 401) {
 		logout();
@@ -237,7 +229,10 @@ export async function streamChatMessage(
 				status === 'streaming_answer' ||
 				status === 'completed'
 			) {
-				resolved.handlers.onStatus?.(status, typeof payload.message === 'string' ? payload.message : undefined);
+				resolved.handlers.onStatus?.(
+					status,
+					typeof payload.message === 'string' ? payload.message : undefined
+				);
 			}
 		} else if (sseEvent.event === 'metadata') {
 			resolved.handlers.onMetadata?.({

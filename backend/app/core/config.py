@@ -22,6 +22,9 @@ class Settings:
         "KIKU_FRONTEND_ORIGIN", "http://localhost:5173"
     ).startswith("https://")
     
+    environment: str = os.getenv("KIKU_ENV", "development").strip().lower()
+    enable_openapi: bool = (os.getenv("KIKU_ENABLE_OPENAPI") or "").strip().lower() in {"1", "true", "yes"} or environment != "production"
+    
     # Opencode LLM Synthesis Configuration
     opencode_api_base_url: str = os.getenv("OPENCODE_API_BASE_URL", "https://opencode.ai/zen/v1")
     opencode_api_key: str = os.getenv("OPENCODE_API_KEY", "")
@@ -34,3 +37,8 @@ class Settings:
 
 
 settings = Settings()
+
+
+def validate_runtime_settings() -> None:
+    if settings.environment == "production" and settings.frontend_origin.startswith("http://localhost"):
+        raise RuntimeError("KIKU_FRONTEND_ORIGIN must be set to a production origin when KIKU_ENV=production.")

@@ -40,9 +40,11 @@ describe('durable chat stream parser', () => {
 		});
 		vi.stubGlobal(
 			'fetch',
-			vi.fn().mockResolvedValue(
-				new Response(body, { status: 200, headers: { 'Content-Type': 'text/event-stream' } })
-			)
+			vi
+				.fn()
+				.mockResolvedValue(
+					new Response(body, { status: 200, headers: { 'Content-Type': 'text/event-stream' } })
+				)
 		);
 
 		const statuses: string[] = [];
@@ -66,7 +68,9 @@ describe('durable chat stream parser', () => {
 		expect(done).toEqual([{ status: 'completed', message_id: 'message-1' }]);
 		expect(fetch).toHaveBeenCalledWith(
 			'http://localhost:8000/api/v1/workspaces/ws_acme/chat/sessions/session%2Fone/stream',
-			expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer token-test' }) })
+			expect.objectContaining({
+				headers: expect.objectContaining({ Authorization: 'Bearer token-test' })
+			})
 		);
 	});
 

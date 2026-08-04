@@ -1,22 +1,16 @@
 <script lang="ts">
+	/* eslint-disable svelte/no-navigation-without-resolve */
 	import { goto } from '$app/navigation';
 	import KikuMascot from '$lib/components/KikuMascot.svelte';
-	import {
-		createSession,
-		getMessages,
-		streamChatMessage,
-		type ChatStatus
-	} from './chatApi';
+	import { createSession, getMessages, streamChatMessage } from './chatApi';
 	import { consumeInitialQuery, storeInitialQuery } from './initialQuery';
 	import { requireAuth } from '$lib/stores/auth';
 	import type { ChatMessage } from './types';
 
 	let { sessionId = null }: { sessionId?: string | null } = $props();
-
 	let messages = $state<ChatMessage[]>([]);
 	let query = $state('');
 	let isStreaming = $state(false);
-	let status = $state<ChatStatus | null>(null);
 	let statusMessage = $state('');
 	let errorMessage = $state<string | null>(null);
 	let abortController: AbortController | null = null;
@@ -31,7 +25,6 @@
 
 		if (!currentSessionId) {
 			messages = [];
-			status = null;
 			statusMessage = '';
 			errorMessage = null;
 			return;
@@ -102,7 +95,6 @@
 		streamingAssistantId = assistantMessage.id;
 		messages = [...messages, userMessage, assistantMessage];
 		isStreaming = true;
-		status = null;
 		statusMessage = '';
 		errorMessage = null;
 		const controller = new AbortController();
@@ -116,7 +108,6 @@
 				'All',
 				{
 					onStatus: (nextStatus, message) => {
-						status = nextStatus;
 						statusMessage = message ?? nextStatus.replaceAll('_', ' ');
 					},
 					onMetadata: (metadata) => {
@@ -134,7 +125,6 @@
 					onDone: (result) => {
 						completed = result.status === 'completed';
 						if (result.message_id) assistantMessage.id = result.message_id;
-						status = result.status === 'completed' ? 'completed' : null;
 						statusMessage = result.status === 'completed' ? 'Answer complete.' : result.status;
 						messages = [...messages];
 					}
@@ -170,7 +160,6 @@
 		abortController.abort();
 		removeStreamingAssistant();
 		isStreaming = false;
-		status = null;
 		statusMessage = 'Generation stopped. The partial response was not saved.';
 		streamingAssistantId = null;
 		abortController = null;
@@ -209,12 +198,15 @@
 						{/if}
 						<div class="bubble">
 							<p>
-								{message.content}{#if isStreaming && message.id === streamingAssistantId}<span class="cursor" aria-hidden="true">▊</span>{/if}
+								{message.content}{#if isStreaming && message.id === streamingAssistantId}<span
+										class="cursor"
+										aria-hidden="true">▊</span
+									>{/if}
 							</p>
 							{#if message.citations && message.citations.length > 0}
 								<details class="citations-accordion">
 									<summary>Grounded sources ({message.citations.length})</summary>
-									{#each message.citations as citation}
+									{#each message.citations as citation (`${citation.source_id}-${citation.version}-${citation.location}`)}
 										<div class="cite-card">
 											<strong>{citation.title}</strong>
 											<span>{citation.location} · v{citation.version}</span>
@@ -236,19 +228,27 @@
 	</div>
 
 	<div class="input-bar-container">
-		<form onsubmit={(event) => { event.preventDefault(); void handleSend(); }}>
+		<form
+			onsubmit={(event) => {
+				event.preventDefault();
+				void handleSend();
+			}}
+		>
 			<textarea
 				bind:value={query}
 				aria-label="Message Kiku"
 				placeholder="Message Kiku..."
 				rows="1"
 				disabled={isStreaming}
-				onkeydown={handleKeydown}
-			></textarea>
+				onkeydown={handleKeydown}></textarea>
 			{#if isStreaming}
-				<button type="button" class="stop-btn" aria-label="Stop generating" onclick={handleStop}>Stop</button>
+				<button type="button" class="stop-btn" aria-label="Stop generating" onclick={handleStop}
+					>Stop</button
+				>
 			{:else}
-				<button type="submit" class="send-btn" aria-label="Send message" disabled={!query.trim()}>Send</button>
+				<button type="submit" class="send-btn" aria-label="Send message" disabled={!query.trim()}
+					>Send</button
+				>
 			{/if}
 		</form>
 		<p class="input-hint">Enter to send · Shift+Enter for a new line</p>
@@ -274,39 +274,184 @@
 		justify-items: center;
 		text-align: center;
 	}
-	.empty-state h2 { margin: 18px 0 4px; color: var(--color-heading); font-size: 24px; font-weight: 650; }
-	.empty-state p { margin: 0; color: var(--color-muted); }
-	.messages-list { display: flex; flex-direction: column; gap: 18px; }
-	.message-row { display: flex; max-width: 86%; align-items: flex-start; gap: 10px; }
-	.message-row.user { align-self: flex-end; flex-direction: row-reverse; }
-	.message-row.user .bubble { border-color: transparent; border-radius: 18px 18px 4px 18px; background: var(--color-accent); color: white; }
-	.message-row.assistant .bubble { border-radius: 18px 18px 18px 4px; background: var(--color-surface); }
-	.bubble { border: 1px solid var(--color-border); padding: 13px 16px; color: var(--color-text); line-height: 1.6; }
-	.bubble p { margin: 0; white-space: pre-wrap; }
-	.avatar { width: 30px; flex: 0 0 30px; padding-top: 4px; }
-	:global(.avatar-art) { width: 30px; height: 30px; border-radius: 50%; }
-	:global(.mascot-large) { width: 72px; height: 72px; }
-	.cursor { display: inline-block; color: var(--color-accent); animation: blink 1s infinite; }
-	@keyframes blink { 50% { opacity: 0; } }
-	.citations-accordion { margin-top: 11px; border-top: 1px solid var(--color-border); padding-top: 9px; color: var(--color-subtle); font-size: 12px; }
-	.citations-accordion summary { cursor: pointer; font-weight: 650; }
-	.cite-card { display: grid; gap: 2px; margin-top: 8px; border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-surface-soft); padding: 9px; }
-	.cite-card strong { color: var(--color-heading); }
-	.cite-card span { color: var(--color-muted); font-size: 11px; }
-	.cite-card .snippet { color: var(--color-subtle); font-style: italic; }
-	.live-status { min-height: 22px; margin-top: 14px; color: var(--color-muted); font-size: 12px; }
-	.error-state { margin-top: 8px; border: 1px solid var(--color-destructive-border); border-radius: 10px; background: var(--color-destructive-soft); padding: 10px 12px; color: var(--color-destructive-fg); font-size: 13px; }
-	.input-bar-container { position: sticky; bottom: 0; width: min(100% - 48px, 960px); margin: auto auto 0; border-top: 1px solid var(--color-border); background: color-mix(in srgb, var(--color-bg) 92%, transparent); padding: 14px 0 18px; backdrop-filter: blur(10px); }
-	form { display: flex; align-items: flex-end; gap: 9px; }
-	textarea { min-height: 46px; max-height: 160px; flex: 1; resize: vertical; border: 1px solid var(--color-border-strong); border-radius: var(--radius-control); background: var(--color-surface); padding: 12px 14px; color: var(--color-text); outline: none; }
-	textarea:focus { border-color: var(--color-accent); box-shadow: 0 0 0 3px var(--color-focus-ring); }
-	button { min-height: 46px; border: 0; border-radius: var(--radius-control); padding: 0 18px; cursor: pointer; font-weight: 650; }
-	button:disabled { cursor: not-allowed; opacity: 0.5; }
-	.send-btn { background: var(--color-accent); color: var(--color-primary-fg); }
-	.stop-btn { background: var(--color-destructive); color: var(--color-primary-fg); }
-	.input-hint { margin: 6px 2px 0; color: var(--color-muted); font-size: 11px; }
+	.empty-state h2 {
+		margin: 18px 0 4px;
+		color: var(--color-heading);
+		font-size: 24px;
+		font-weight: 650;
+	}
+	.empty-state p {
+		margin: 0;
+		color: var(--color-muted);
+	}
+	.messages-list {
+		display: flex;
+		flex-direction: column;
+		gap: 18px;
+	}
+	.message-row {
+		display: flex;
+		max-width: 86%;
+		align-items: flex-start;
+		gap: 10px;
+	}
+	.message-row.user {
+		align-self: flex-end;
+		flex-direction: row-reverse;
+	}
+	.message-row.user .bubble {
+		border-color: transparent;
+		border-radius: 18px 18px 4px 18px;
+		background: var(--color-accent);
+		color: white;
+	}
+	.message-row.assistant .bubble {
+		border-radius: 18px 18px 18px 4px;
+		background: var(--color-surface);
+	}
+	.bubble {
+		border: 1px solid var(--color-border);
+		padding: 13px 16px;
+		color: var(--color-text);
+		line-height: 1.6;
+	}
+	.bubble p {
+		margin: 0;
+		white-space: pre-wrap;
+	}
+	.avatar {
+		width: 30px;
+		flex: 0 0 30px;
+		padding-top: 4px;
+	}
+	:global(.avatar-art) {
+		width: 30px;
+		height: 30px;
+		border-radius: 50%;
+	}
+	:global(.mascot-large) {
+		width: 72px;
+		height: 72px;
+	}
+	.cursor {
+		display: inline-block;
+		color: var(--color-accent);
+		animation: blink 1s infinite;
+	}
+	@keyframes blink {
+		50% {
+			opacity: 0;
+		}
+	}
+	.citations-accordion {
+		margin-top: 11px;
+		border-top: 1px solid var(--color-border);
+		padding-top: 9px;
+		color: var(--color-subtle);
+		font-size: 12px;
+	}
+	.citations-accordion summary {
+		cursor: pointer;
+		font-weight: 650;
+	}
+	.cite-card {
+		display: grid;
+		gap: 2px;
+		margin-top: 8px;
+		border: 1px solid var(--color-border);
+		border-radius: 10px;
+		background: var(--color-surface-soft);
+		padding: 9px;
+	}
+	.cite-card strong {
+		color: var(--color-heading);
+	}
+	.cite-card span {
+		color: var(--color-muted);
+		font-size: 11px;
+	}
+	.cite-card .snippet {
+		color: var(--color-subtle);
+		font-style: italic;
+	}
+	.live-status {
+		min-height: 22px;
+		margin-top: 14px;
+		color: var(--color-muted);
+		font-size: 12px;
+	}
+	.error-state {
+		margin-top: 8px;
+		border: 1px solid var(--color-destructive-border);
+		border-radius: 10px;
+		background: var(--color-destructive-soft);
+		padding: 10px 12px;
+		color: var(--color-destructive-fg);
+		font-size: 13px;
+	}
+	.input-bar-container {
+		position: sticky;
+		bottom: 0;
+		width: min(100% - 48px, 960px);
+		margin: auto auto 0;
+		border-top: 1px solid var(--color-border);
+		background: color-mix(in srgb, var(--color-bg) 92%, transparent);
+		padding: 14px 0 18px;
+		backdrop-filter: blur(10px);
+	}
+	form {
+		display: flex;
+		align-items: flex-end;
+		gap: 9px;
+	}
+	textarea {
+		min-height: 46px;
+		max-height: 160px;
+		flex: 1;
+		resize: vertical;
+		border: 1px solid var(--color-border-strong);
+		border-radius: var(--radius-control);
+		background: var(--color-surface);
+		padding: 12px 14px;
+		color: var(--color-text);
+		outline: none;
+	}
+	textarea:focus {
+		border-color: var(--color-accent);
+		box-shadow: 0 0 0 3px var(--color-focus-ring);
+	}
+	button {
+		min-height: 46px;
+		border: 0;
+		border-radius: var(--radius-control);
+		padding: 0 18px;
+		cursor: pointer;
+		font-weight: 650;
+	}
+	button:disabled {
+		cursor: not-allowed;
+		opacity: 0.5;
+	}
+	.send-btn {
+		background: var(--color-accent);
+		color: var(--color-primary-fg);
+	}
+	.stop-btn {
+		background: var(--color-destructive);
+		color: var(--color-primary-fg);
+	}
+	.input-hint {
+		margin: 6px 2px 0;
+		color: var(--color-muted);
+		font-size: 11px;
+	}
 	@media (max-width: 640px) {
-		.chat-content, .input-bar-container { width: min(100% - 28px, 560px); }
-		.message-row { max-width: 94%; }
+		.chat-content,
+		.input-bar-container {
+			width: min(100% - 28px, 560px);
+		}
+		.message-row {
+			max-width: 94%;
+		}
 	}
 </style>

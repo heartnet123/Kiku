@@ -21,7 +21,7 @@
 			<strong>{result.source.title || result.source.id}</strong>
 			{#if result.source.version}
 				<span
-					class="source-version-tag rounded bg-success-soft px-1.5 py-0.5 font-mono text-[10px] text-success-fg border border-success-border"
+					class="source-version-tag rounded border border-success-border bg-success-soft px-1.5 py-0.5 font-mono text-[10px] text-success-fg"
 					>v{result.source.version}</span
 				>
 			{/if}

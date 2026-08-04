@@ -40,11 +40,11 @@ def test_login_sets_httponly_cookies(client):
         r = client.post("/api/v1/auth/login", json={"email": "test@example.com", "password": "pw"})
 
     assert r.status_code == 200
+    assert "refresh_token" not in r.json()
     set_cookie_headers = [v for k, v in r.headers.items() if k.lower() == "set-cookie"]
     access_header = next((h for h in set_cookie_headers if "kiku_access_token" in h), "")
     assert "HttpOnly" in access_header
     assert "SameSite=lax" in access_header.lower() or "samesite=lax" in access_header.lower()
-
 
 def test_register_sets_httponly_cookies(client):
     mock_resp = _mock_login_response()
@@ -59,8 +59,8 @@ def test_register_sets_httponly_cookies(client):
         )
 
     assert r.status_code == 201
+    assert "refresh_token" not in r.json()
     _assert_access_cookie_hardened(r)
-
 
 def test_refresh_reads_refresh_cookie(client):
     """POST /auth/refresh must work off the HttpOnly cookie with no request body token."""
@@ -78,8 +78,8 @@ def test_refresh_reads_refresh_cookie(client):
         sb.auth.refresh_session.assert_called_once_with("cookie-refresh")
 
     assert r.status_code == 200
+    assert "refresh_token" not in r.json()
     _assert_access_cookie_hardened(r)
-
 
 def test_refresh_without_token_is_unauthorized(client):
     r = client.post("/api/v1/auth/refresh", json={})

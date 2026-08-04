@@ -29,15 +29,12 @@
 				user?: UserProfile;
 				workspaces?: WorkspaceItem[];
 				requires_email_confirmation?: boolean;
-			}>(
-				'/api/v1/auth/' + (mode === 'login' ? 'login' : 'register'),
-				{
-					method: 'POST',
-					body: JSON.stringify(
-						mode === 'login' ? { email, password } : { email, password, full_name: fullName }
-					)
-				}
-			);
+			}>('/api/v1/auth/' + (mode === 'login' ? 'login' : 'register'), {
+				method: 'POST',
+				body: JSON.stringify(
+					mode === 'login' ? { email, password } : { email, password, full_name: fullName }
+				)
+			});
 
 			if (!response.token) {
 				infoMessage = 'Registration successful. Confirm your email, then sign in.';
@@ -70,7 +67,7 @@
 	>
 		<button
 			type="button"
-			class="absolute right-4 top-4 rounded-lg p-1 text-muted hover:bg-surface-raised hover:text-heading"
+			class="absolute top-4 right-4 rounded-lg p-1 text-muted hover:bg-surface-raised hover:text-heading"
 			onclick={closeLoginModal}
 			aria-label="Close auth dialog"
 		>
@@ -89,7 +86,7 @@
 		</div>
 
 		<div
-			class="mb-5 grid grid-cols-2 rounded-lg bg-surface-raised p-1 border border-border"
+			class="mb-5 grid grid-cols-2 rounded-lg border border-border bg-surface-raised p-1"
 			role="tablist"
 			aria-label="Authentication mode"
 		>
@@ -132,9 +129,7 @@
 		<form onsubmit={handleSubmit} class="space-y-4">
 			{#if mode === 'register'}
 				<div>
-					<label for="full-name" class="mb-1 block text-xs font-medium text-text"
-						>Full name</label
-					>
+					<label for="full-name" class="mb-1 block text-xs font-medium text-text">Full name</label>
 					<input
 						id="full-name"
 						type="text"

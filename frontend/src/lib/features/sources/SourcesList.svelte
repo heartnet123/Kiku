@@ -53,7 +53,10 @@
 					bg: 'bg-success-soft text-success-fg border-success-border'
 				};
 			case 'pdf':
-				return { label: 'PDF', bg: 'bg-destructive-soft text-destructive-fg border-destructive-border' };
+				return {
+					label: 'PDF',
+					bg: 'bg-destructive-soft text-destructive-fg border-destructive-border'
+				};
 			default:
 				return { label: 'Text', bg: 'bg-accent-soft text-accent border-border' };
 		}
@@ -65,8 +68,7 @@
 	{#if metrics}
 		<div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
 			<div class="rounded-xl border border-border bg-surface p-4 shadow-sm">
-				<span class="text-xs font-semibold tracking-wider text-muted uppercase"
-					>Total Ingested</span
+				<span class="text-xs font-semibold tracking-wider text-muted uppercase">Total Ingested</span
 				>
 				<p class="mt-1 text-2xl font-bold text-heading">{metrics.total_attempts}</p>
 			</div>
@@ -77,7 +79,9 @@
 				<p class="mt-1 text-2xl font-bold text-success-fg">{metrics.ready_count}</p>
 			</div>
 			<div class="rounded-xl border border-destructive-border bg-destructive-soft p-4 shadow-sm">
-				<span class="text-xs font-semibold tracking-wider text-destructive-fg uppercase">Failed Jobs</span>
+				<span class="text-xs font-semibold tracking-wider text-destructive-fg uppercase"
+					>Failed Jobs</span
+				>
 				<p class="mt-1 text-2xl font-bold text-destructive-fg">{metrics.failed_count}</p>
 			</div>
 			<div class="rounded-xl border border-border bg-accent-soft p-4 shadow-sm">
@@ -303,9 +307,7 @@
 								</p>
 							</div>
 							<div class="text-right">
-								<span class="text-xs text-text"
-									>{(version.file_size / 1024).toFixed(1)} KB</span
-								>
+								<span class="text-xs text-text">{(version.file_size / 1024).toFixed(1)} KB</span>
 								<p class="text-[10px] text-muted">{version.created_at}</p>
 							</div>
 						</div>

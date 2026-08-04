@@ -1,4 +1,5 @@
 <script lang="ts">
+	/* eslint-disable svelte/no-navigation-without-resolve */
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import Icon, { type IconName } from '$lib/components/Icon.svelte';
@@ -45,7 +46,6 @@
 			// Drop stale failures; a newer load already owns the list.
 		}
 	}
-
 	async function handleDeleteChat(id: string, event: MouseEvent) {
 		event.stopPropagation();
 		requireAuth(async () => {
@@ -53,7 +53,9 @@
 				await deleteSession(id);
 				sessions = sessions.filter((s) => s.id !== id);
 				if (page.params.sessionId === id) await goto('/');
-			} catch {}
+			} catch {
+				// Delete failed; UI state unchanged
+			}
 		});
 	}
 
@@ -86,12 +88,7 @@
 		<nav class="primary-nav">
 			{#each navItems as item (item.href)}
 				{@const isActive = page.url.pathname === item.href}
-				<a
-					class="nav-item"
-					class:active={isActive}
-					href={item.href}
-					aria-current={isActive ? 'page' : undefined}
-				>
+				<a class="nav-item" href={item.href} aria-current={isActive ? 'page' : undefined}>
 					<Icon name={item.icon} size={18} />
 					<span>{item.label}</span>
 				</a>
@@ -140,7 +137,7 @@
 		{#if isDropdownOpen && $authStore.isAuthenticated}
 			<div class="workspace-dropdown">
 				<div class="dropdown-header">Workspaces</div>
-				{#each $workspaceStore.workspaces as ws}
+				{#each $workspaceStore.workspaces as ws (ws.id)}
 					<button
 						type="button"
 						class="dropdown-item"
@@ -182,7 +179,8 @@
 				</strong>
 				<small>
 					{#if $authStore.isAuthenticated && $authStore.user}
-						{$authStore.user.full_name} ({$workspaceStore.currentWorkspace?.role?.toUpperCase() || 'MEMBER'})
+						{$authStore.user.full_name} ({$workspaceStore.currentWorkspace?.role?.toUpperCase() ||
+							'MEMBER'})
 					{:else if $authStore.isRehydrating}
 						Checking session...
 					{:else}
@@ -245,7 +243,9 @@
 		background: var(--color-surface-raised);
 		color: var(--color-text);
 		cursor: pointer;
-		transition: background 150ms ease, color 150ms ease;
+		transition:
+			background 150ms ease,
+			color 150ms ease;
 	}
 	.theme-toggle-btn:hover {
 		background: var(--color-surface-soft);
@@ -279,7 +279,7 @@
 	.nav-item:active {
 		transform: scale(0.985);
 	}
-	.nav-item.active {
+	.nav-item[aria-current='page'] {
 		background: var(--color-accent-soft);
 		color: var(--color-accent);
 	}
