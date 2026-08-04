@@ -1,5 +1,7 @@
 # ponytail: per-process limiter; replace with Redis/provider WAF when multiple API instances or high traffic matter
+import re
 from collections import defaultdict
+from math import ceil
 from time import time
 from typing import Optional
 from fastapi import Request
@@ -21,12 +23,27 @@ _exact_paths = {
     "POST /api/v1/workspaces/join": "workspace-write",
 }
 
+# Dynamic endpoints carry workspace/session IDs; match on shape instead of exact path.
+_dynamic_paths: tuple[tuple[re.Pattern[str], str], ...] = (
+    (re.compile(r"^/api/v1/search$"), "expensive-ai"),
+    (re.compile(r"^/api/v1/workspaces/[^/]+/search$"), "expensive-ai"),
+    (re.compile(r"^/api/v1/workspaces/[^/]+/chat/sessions$"), "expensive-ai"),
+    (re.compile(r"^/api/v1/workspaces/[^/]+/chat/sessions/[^/]+/stream$"), "expensive-ai"),
+    (re.compile(r"^/api/v1/workspaces/[^/]+/sources$"), "upload"),
+)
+
 _store: defaultdict[str, list[float]] = defaultdict(list)
 
 
 def _match_rule(method: str, path: str) -> str | None:
-    method_path = f"{method} {path}"
-    return _exact_paths.get(method_path)
+    rule = _exact_paths.get(f"{method} {path}")
+    if rule:
+        return rule
+    if method == "POST":
+        for pattern, rule_name in _dynamic_paths:
+            if pattern.match(path):
+                return rule_name
+    return None
 
 
 def check_rate_limit(request: Request) -> Optional[int]:
@@ -45,7 +62,7 @@ def check_rate_limit(request: Request) -> Optional[int]:
         _store[key] = [t for t in _store[key] if now - t < _window_seconds]
 
         if len(_store[key]) >= limit:
-            retry_after = int(_window_seconds - (now - _store[key][0]))
+            retry_after = max(1, ceil(_window_seconds - (now - _store[key][0])))
             return retry_after
 
         _store[key].append(now)

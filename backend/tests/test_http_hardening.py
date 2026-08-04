@@ -25,6 +25,22 @@ def test_api_no_store_cache(client):
     assert r.headers.get("Cache-Control") == "no-store"
     assert "Origin" in r.headers.get("Vary", "")
 
+def test_invalid_environment_rejected():
+    """Unknown KIKU_ENV values fail startup validation instead of acting like non-production."""
+    from app.core.config import validate_runtime_settings
+    class MockSettings:
+        environment = "prod"
+        frontend_origin = "http://localhost:5173"
+    import app.core.config as config_module
+    original_settings = config_module.settings
+    config_module.settings = MockSettings()
+    try:
+        with pytest.raises(RuntimeError, match="KIKU_ENV"):
+            validate_runtime_settings()
+    finally:
+        config_module.settings = original_settings
+
+
 def test_production_config_validation():
     """validate_runtime_settings raises when production env has localhost origin."""
     from app.core.config import Settings, validate_runtime_settings

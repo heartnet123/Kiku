@@ -15,14 +15,6 @@ app = FastAPI(
     redoc_url="/redoc" if settings.enable_openapi else None,
     openapi_url="/openapi.json" if settings.enable_openapi else None,
 )
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[settings.frontend_origin],
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type"],
-)
-
 @app.middleware("http")
 async def add_api_hardening_headers(request: Request, call_next):
     retry_after = check_rate_limit(request)
@@ -33,21 +25,28 @@ async def add_api_hardening_headers(request: Request, call_next):
             headers={"Retry-After": str(retry_after)},
         )
     response = await call_next(request)
-    if not response.headers.get("X-Content-Type-Options"):
-        response.headers["X-Content-Type-Options"] = "nosniff"
-    if not response.headers.get("X-Frame-Options"):
-        response.headers["X-Frame-Options"] = "DENY"
-    if not response.headers.get("Referrer-Policy"):
-        response.headers["Referrer-Policy"] = "no-referrer"
-    if not response.headers.get("Permissions-Policy"):
-        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
     if request.url.path.startswith(settings.api_prefix):
-        if not response.headers.get("Cache-Control"):
-            response.headers["Cache-Control"] = "no-store"
+        response.headers["Cache-Control"] = "no-store"
         vary = response.headers.get("Vary", "")
         if "Origin" not in vary:
             response.headers["Vary"] = f"{vary}, Origin" if vary else "Origin"
     return response
+
+
+# Added last so CORS is outermost: rate-limited 429s returned by the middleware
+# above still get CORS headers, including the exposed Retry-After.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[settings.frontend_origin],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
+    expose_headers=["Retry-After"],
+)
 
 
 app.include_router(api_router, prefix=settings.api_prefix)

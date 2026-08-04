@@ -206,7 +206,7 @@
 							{#if message.citations && message.citations.length > 0}
 								<details class="citations-accordion">
 									<summary>Grounded sources ({message.citations.length})</summary>
-									{#each message.citations as citation (`${citation.source_id}-${citation.version}-${citation.location}`)}
+									{#each message.citations as citation (JSON.stringify( [citation.source_id, citation.version, citation.location] ))}
 										<div class="cite-card">
 											<strong>{citation.title}</strong>
 											<span>{citation.location} · v{citation.version}</span>

@@ -40,5 +40,9 @@ settings = Settings()
 
 
 def validate_runtime_settings() -> None:
+    if settings.environment not in {"development", "production"}:
+        raise RuntimeError(
+            f"KIKU_ENV must be 'development' or 'production', got '{settings.environment}'."
+        )
     if settings.environment == "production" and settings.frontend_origin.startswith("http://localhost"):
         raise RuntimeError("KIKU_FRONTEND_ORIGIN must be set to a production origin when KIKU_ENV=production.")
