@@ -27,12 +27,15 @@ export async function uploadWorkspaceSource(file: File, workspaceId?: string): P
 		headers['Authorization'] = `Bearer ${token}`;
 	}
 
-	const response = await fetch(apiUrl(`/api/v1/workspaces/${encodeURIComponent(activeId)}/sources`), {
-		method: 'POST',
-		headers,
-		body: formData,
-		credentials: 'include'
-	});
+	const response = await fetch(
+		apiUrl(`/api/v1/workspaces/${encodeURIComponent(activeId)}/sources`),
+		{
+			method: 'POST',
+			headers,
+			body: formData,
+			credentials: 'include'
+		}
+	);
 
 	if (response.status === 401) {
 		logout();

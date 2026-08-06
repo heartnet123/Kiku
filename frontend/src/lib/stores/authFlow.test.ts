@@ -1,16 +1,15 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { get } from 'svelte/store';
 import {
 	authStore,
 	setAuthSession,
 	logout,
 	rehydrateAuth,
-	_scheduleTokenRefresh,
 	getAuthToken,
 	getCurrentUser,
 	initFromServer
 } from './auth';
-import { workspaceStore, setWorkspaces, switchWorkspace, clearWorkspaces } from './workspace';
+import { workspaceStore, setWorkspaces, switchWorkspace } from './workspace';
 
 describe('Frontend Auth State Sync & Session Lifecycle Flow', () => {
 	const user = { id: 'usr-100', email: 'alice@example.com', full_name: 'Alice Cooper' };

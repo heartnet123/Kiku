@@ -55,7 +55,7 @@ def _sync_public_user(user: User, token: str | None = None) -> None:
 
 def _set_auth_cookies(response: Response, token: str | None, refresh_token: str | None, max_age: int = 3600) -> None:
     """Attach HttpOnly session cookies. secure follows settings.cookie_secure (HTTPS origins)."""
-    kwargs: dict = dict(httponly=True, samesite="lax", secure=settings.cookie_secure)
+    kwargs: dict = dict(httponly=True, samesite="lax", secure=settings.cookie_secure, path="/")
     if token:
         response.set_cookie("kiku_access_token", token, max_age=max_age, **kwargs)
     if refresh_token:
@@ -63,7 +63,7 @@ def _set_auth_cookies(response: Response, token: str | None, refresh_token: str 
 
 
 def _clear_auth_cookies(response: Response) -> None:
-    kwargs: dict = dict(httponly=True, samesite="lax", secure=settings.cookie_secure)
+    kwargs: dict = dict(httponly=True, samesite="lax", secure=settings.cookie_secure, path="/")
     response.delete_cookie("kiku_access_token", **kwargs)
     response.delete_cookie("kiku_refresh_token", **kwargs)
 
@@ -107,7 +107,6 @@ async def register(request: RegisterRequest, response: Response) -> LoginRespons
         _set_auth_cookies(response, token, refresh_token)
     return _login_response(
         token,
-        refresh_token,
         user,
         workspaces,
         requires_email_confirmation=session is None,
@@ -158,7 +157,7 @@ async def login(request: LoginRequest, response: Response) -> LoginResponse:
     scoped_client = create_supabase_client(token)
     workspaces = _build_user_workspaces(user.id, scoped_client)
     _set_auth_cookies(response, token, refresh_token)
-    return _login_response(token, refresh_token, user, workspaces)
+    return _login_response(token, user, workspaces)
 
 
 @router.get("/me", response_model=LoginResponse)
@@ -169,7 +168,6 @@ async def get_me(
     scoped_client = create_supabase_client(token)
     return _login_response(
         token,
-        None,
         user,
         _build_user_workspaces(user.id, scoped_client) if scoped_client else _build_user_workspaces(user.id),
     )
@@ -218,7 +216,6 @@ async def refresh_session(
     _set_auth_cookies(response, token, new_refresh_token)
     return _login_response(
         token,
-        new_refresh_token,
         user,
         _build_user_workspaces(user.id, scoped_client),
     )

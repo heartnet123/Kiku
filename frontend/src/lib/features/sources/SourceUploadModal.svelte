@@ -71,12 +71,7 @@
 		>
 			<div class="flex items-center justify-between border-b border-border pb-4">
 				<h3 class="flex items-center gap-2 text-xl font-bold tracking-tight text-heading">
-					<svg
-						class="h-6 w-6 text-accent"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-					>
+					<svg class="h-6 w-6 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 						<path
 							stroke-linecap="round"
 							stroke-linejoin="round"
@@ -104,10 +99,10 @@
 
 			<div class="mt-4 space-y-4">
 				<p class="text-sm text-subtle">
-					Upload a Markdown (<code class="text-accent font-semibold">.md</code>), plain text (<code
-						class="text-accent font-semibold">.txt</code
-					>), or PDF (<code class="text-accent font-semibold">.pdf</code>) document. LlamaIndex will index its
-					content into your workspace vector store.
+					Upload a Markdown (<code class="font-semibold text-accent">.md</code>), plain text (<code
+						class="font-semibold text-accent">.txt</code
+					>), or PDF (<code class="font-semibold text-accent">.pdf</code>) document. LlamaIndex will
+					index its content into your workspace vector store.
 				</p>
 
 				<!-- Dropzone -->
@@ -147,9 +142,7 @@
 					</svg>
 					{#if selectedFile}
 						<span class="font-semibold text-accent">{selectedFile.name}</span>
-						<span class="mt-1 text-xs text-muted"
-							>{(selectedFile.size / 1024).toFixed(1)} KB</span
-						>
+						<span class="mt-1 text-xs text-muted">{(selectedFile.size / 1024).toFixed(1)} KB</span>
 					{:else}
 						<span class="text-sm font-medium text-heading"
 							>Drag and drop your file here, or <span class="text-accent underline">browse</span

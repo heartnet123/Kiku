@@ -39,11 +39,9 @@ class WorkspaceResponse(BaseModel):
 
 class LoginResponse(BaseModel):
     token: str | None = None
-    refresh_token: str | None = None
     user: UserResponse
     workspaces: list[WorkspaceResponse]
     requires_email_confirmation: bool = False
-
 
 class WorkspaceCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=120)

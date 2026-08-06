@@ -13,7 +13,20 @@ export const handle: Handle = async ({ event, resolve }) => {
 	if (!token) {
 		event.locals.authState = null;
 		event.locals.workspaces = null;
-		return resolve(event);
+		const response = await resolve(event);
+		if (!response.headers.get('X-Content-Type-Options')) {
+			response.headers.set('X-Content-Type-Options', 'nosniff');
+		}
+		if (!response.headers.get('Referrer-Policy')) {
+			response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+		}
+		if (!response.headers.get('Permissions-Policy')) {
+			response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+		}
+		if (!response.headers.get('X-Frame-Options')) {
+			response.headers.set('X-Frame-Options', 'DENY');
+		}
+		return response;
 	}
 
 	try {
@@ -25,7 +38,20 @@ export const handle: Handle = async ({ event, resolve }) => {
 		if (!response.ok) {
 			event.locals.authState = null;
 			event.locals.workspaces = null;
-			return resolve(event);
+			const resolved = await resolve(event);
+			if (!resolved.headers.get('X-Content-Type-Options')) {
+				resolved.headers.set('X-Content-Type-Options', 'nosniff');
+			}
+			if (!resolved.headers.get('Referrer-Policy')) {
+				resolved.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+			}
+			if (!resolved.headers.get('Permissions-Policy')) {
+				resolved.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+			}
+			if (!resolved.headers.get('X-Frame-Options')) {
+				resolved.headers.set('X-Frame-Options', 'DENY');
+			}
+			return resolved;
 		}
 
 		const data = (await response.json()) as {
@@ -50,5 +76,18 @@ export const handle: Handle = async ({ event, resolve }) => {
 		event.locals.workspaces = null;
 	}
 
-	return resolve(event);
+	const response = await resolve(event);
+	if (!response.headers.get('X-Content-Type-Options')) {
+		response.headers.set('X-Content-Type-Options', 'nosniff');
+	}
+	if (!response.headers.get('Referrer-Policy')) {
+		response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+	}
+	if (!response.headers.get('Permissions-Policy')) {
+		response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+	}
+	if (!response.headers.get('X-Frame-Options')) {
+		response.headers.set('X-Frame-Options', 'DENY');
+	}
+	return response;
 };

@@ -41,7 +41,9 @@
 		cursor: pointer;
 		font-size: 11px;
 		font-weight: 500;
-		transition: transform 150ms ease, box-shadow 150ms ease;
+		transition:
+			transform 150ms ease,
+			box-shadow 150ms ease;
 	}
 	.category:hover {
 		transform: translateY(-1px);

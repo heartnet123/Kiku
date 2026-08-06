@@ -91,15 +91,17 @@ describe('chat API', () => {
 		setAuthSession('token-test', user, [workspace]);
 		vi.stubGlobal(
 			'fetch',
-			vi.fn().mockResolvedValue(
-				new Response(
-					'event: metadata\ndata: {"citations":[]}\n\n' +
-						'event: delta\ndata: {"content":"Partial answer"}\n\n' +
-						'event: error\ndata: {"message":"LLM returned status 429"}\n\n' +
-						'event: done\ndata: {"status":"completed"}\n\n',
-					{ status: 200, headers: { 'Content-Type': 'text/event-stream' } }
+			vi
+				.fn()
+				.mockResolvedValue(
+					new Response(
+						'event: metadata\ndata: {"citations":[]}\n\n' +
+							'event: delta\ndata: {"content":"Partial answer"}\n\n' +
+							'event: error\ndata: {"message":"LLM returned status 429"}\n\n' +
+							'event: done\ndata: {"status":"completed"}\n\n',
+						{ status: 200, headers: { 'Content-Type': 'text/event-stream' } }
+					)
 				)
-			)
 		);
 
 		const errors: string[] = [];

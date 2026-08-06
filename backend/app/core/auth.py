@@ -95,7 +95,6 @@ def _build_user_workspaces(user_id: str, client: Client | None = None) -> list[d
 
 def _login_response(
     token: str | None,
-    refresh_token: str | None,
     user: User,
     workspaces: list[dict[str, Any]],
     *,
@@ -103,12 +102,10 @@ def _login_response(
 ) -> dict[str, Any]:
     return {
         "token": token,
-        "refresh_token": refresh_token,
         "user": {"id": user.id, "email": user.email, "full_name": user.full_name},
         "workspaces": workspaces,
         "requires_email_confirmation": requires_email_confirmation,
     }
-
 
 def _verify_supabase_token(token: str) -> User:
     client = create_supabase_client()
